@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Logr living-world UI tokens.
+   The animated SCENE is the star. These tokens only style the
+   floating glass panel so it stays readable over any scene.
+   ============================================================ */
+
+:root, [data-theme="sunset"] {
+  --text: #3A2A22; --text-soft: #6E5648;
+  --primary: #C45B3C; --on-primary: #FFFFFF;
+  --panel: rgba(255, 250, 244, 0.52); --panel-border: rgba(255, 255, 255, 0.55);
+  --chip: rgba(255, 255, 255, 0.45); --ring: rgba(196, 91, 60, 0.25);
+}
+[data-theme="winter"] {
+  --text: #EAF0FB; --text-soft: #AAB7D2;
+  --primary: #E8907A; --on-primary: #221821;
+  --panel: rgba(16, 24, 46, 0.42); --panel-border: rgba(255, 255, 255, 0.16);
+  --chip: rgba(255, 255, 255, 0.1); --ring: rgba(232, 144, 122, 0.3);
+}
+[data-theme="rainy"] {
+  --text: #ECE6EE; --text-soft: #B4A8B9;
+  --primary: #E8718E; --on-primary: #2A1820;
+  --panel: rgba(22, 20, 30, 0.46); --panel-border: rgba(255, 255, 255, 0.14);
+  --chip: rgba(255, 255, 255, 0.09); --ring: rgba(232, 113, 142, 0.3);
+}
+[data-theme="lakeside"] {
+  --text: #2E3E3A; --text-soft: #5E726C;
+  --primary: #4F8C84; --on-primary: #FFFFFF;
+  --panel: rgba(255, 253, 247, 0.54); --panel-border: rgba(255, 255, 255, 0.55);
+  --chip: rgba(255, 255, 255, 0.45); --ring: rgba(79, 140, 132, 0.25);
+}
+[data-theme="lavender"] {
+  --text: #3A2E4A; --text-soft: #6A5C7C;
+  --primary: #8E63B5; --on-primary: #FFFFFF;
+  --panel: rgba(255, 250, 255, 0.5); --panel-border: rgba(255, 255, 255, 0.5);
+  --chip: rgba(255, 255, 255, 0.42); --ring: rgba(142, 99, 181, 0.25);
+}
+[data-theme="ocean"] {
+  --text: #1F3E44; --text-soft: #4E6E72;
+  --primary: #2E7E8C; --on-primary: #FFFFFF;
+  --panel: rgba(252, 255, 255, 0.5); --panel-border: rgba(255, 255, 255, 0.55);
+  --chip: rgba(255, 255, 255, 0.45); --ring: rgba(46, 126, 140, 0.25);
+}
+
+@layer base {
+  body {
+    background: #D9B48C;
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; letter-spacing: -0.01em; }
+}
+
+@layer utilities {
+  .panel {
+    background: var(--panel);
+    backdrop-filter: blur(22px) saturate(1.15);
+    -webkit-backdrop-filter: blur(22px) saturate(1.15);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 24px 70px rgba(10, 15, 25, 0.22);
+  }
+  .chip { background: var(--chip); border: 1px solid var(--panel-border); color: var(--text-soft); }
+  .text-soft { color: var(--text-soft); }
+  .btn-primary {
+    background: var(--primary); color: var(--on-primary);
+    box-shadow: 0 8px 22px var(--ring);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .field {
+    background: var(--chip);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    border-radius: 14px;
+  }
+  .field::placeholder { color: var(--text-soft); opacity: 0.7; }
+  .field:focus { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+}
