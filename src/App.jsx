@@ -4,6 +4,7 @@ import Scene from './scenes/Scene'
 import TopBar from './components/TopBar'
 import Today from './screens/Today'
 import Onboarding from './screens/Onboarding'
+import Journey from './screens/Journey'
 import { isOnboarded } from './data/store'
 
 function Shell() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route index element={<Navigate to={isOnboarded() ? '/today' : '/welcome'} replace />} />
             <Route path="/welcome" element={<Onboarding />} />
             <Route path="/today" element={<Today />} />
+            <Route path="/journey" element={<Journey />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
