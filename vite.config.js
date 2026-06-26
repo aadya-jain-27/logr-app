@@ -8,14 +8,14 @@ const API = 'https://generativelanguage.googleapis.com/v1beta'
 const PREFERRED = ['gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash']
 let cachedModel = null
 
-function buildPrompt({ goal, deadline, minutesToday, dayType, material, date }) {
+function buildPrompt({ goal, deadline, minutesToday, dayType, material, date, carriedOver, daysAway }) {
   return `You are Logr, a calm, encouraging study coach. Plan ONLY today for this student.
 
 Today is ${date}, which is ${dayType}.
 Their goal: ${goal || 'general study progress'}
 Target timeframe: ${deadline || 'no fixed deadline'}
 Time they can give today: about ${minutesToday} minutes total.
-${material ? `Their own study material / topics:\n${material}\n` : ''}
+${material ? `Their own study material / topics:\n${material}\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}
 Rules:
 - Plan ONLY today. Usually 2 to 4 small, specific, doable tasks that together fit within ${minutesToday} minutes.
 - Each task is a concrete action (not vague). Suggest a sensible place to do it in "source".

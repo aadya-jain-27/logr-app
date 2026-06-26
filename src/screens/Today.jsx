@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, Clock, Sparkles, Pause, RefreshCw, Coffee, CloudOff } from 'lucide-react'
-import { getProfile, getCachedPlan, savePlan, clearPlan } from '../data/store'
+import { Check, Clock, Sparkles, Pause, RefreshCw, Coffee, CloudOff, Heart } from 'lucide-react'
+import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan } from '../data/store'
 import { requestPlan, todayCapacity } from '../lib/plan'
 
 function greeting() {
@@ -13,10 +13,20 @@ function greeting() {
 }
 
 const withIds = (tasks) => tasks.map((t, i) => ({ id: `t${i}`, done: false, ...t }))
+const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+
+// What did a previous day leave unfinished, and how long ago was it?
+function carryFromPrevious() {
+  const raw = getRawPlan()
+  const today = new Date().toDateString()
+  if (!raw || raw.date === today) return { carriedOver: [], daysAway: 0 }
+  const daysAway = Math.max(1, Math.round((midnight(new Date()) - midnight(new Date(raw.date))) / 86400000))
+  const carriedOver = (raw.plan?.tasks || []).filter((t) => !t.done).map((t) => t.title)
+  return { carriedOver, daysAway }
+}
 
 export default function Today() {
   const profile = getProfile()
-  // No fake fallback: if there's no real profile, the only honest thing is to onboard.
   if (!profile) return <Navigate to="/welcome" replace />
 
   const name = profile.name?.trim()
@@ -26,24 +36,25 @@ export default function Today() {
   const [status, setStatus] = useState('loading') // loading | ready | rest | error
   const [tasks, setTasks] = useState([])
   const [meta, setMeta] = useState({ goalProgress: null, pace: null })
-  const [errKind, setErrKind] = useState(null) // 'no_key' | 'failed'
+  const [errKind, setErrKind] = useState(null)
+  const [welcomeBack, setWelcomeBack] = useState(0) // days away, 0 if none
 
   const generate = useCallback(async () => {
     if (cap.rest) { setStatus('rest'); return }
+    const { carriedOver, daysAway } = carryFromPrevious()
+    setWelcomeBack(daysAway >= 2 ? daysAway : 0)
     setStatus('loading')
     const plan = await requestPlan({
       goal: profile.goal, deadline: profile.deadline, minutesToday: cap.minutes,
-      dayType: cap.dayType, material: profile.material,
+      dayType: cap.dayType, material: profile.material, carriedOver, daysAway,
       date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     })
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length && !plan.error) {
-      savePlan(plan)
-      setTasks(withIds(plan.tasks))
-      setMeta({ goalProgress: plan.goalProgress ?? null, pace: plan.pace || null })
-      setStatus('ready')
+      const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null }
+      savePlan(stored)
+      setTasks(stored.tasks); setMeta({ goalProgress: stored.goalProgress, pace: stored.pace }); setStatus('ready')
     } else {
-      setErrKind(plan?.error === 'no_key' ? 'no_key' : 'failed')
-      setStatus('error')
+      setErrKind(plan?.error === 'no_key' ? 'no_key' : 'failed'); setStatus('error')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cap.minutes, cap.rest, cap.dayType])
@@ -52,15 +63,20 @@ export default function Today() {
     if (cap.rest) { setStatus('rest'); return }
     const cached = getCachedPlan()
     if (cached?.tasks?.length) {
-      setTasks(withIds(cached.tasks))
-      setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null })
-      setStatus('ready')
+      setTasks(withIds(cached.tasks)); setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null }); setStatus('ready')
     } else { generate() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const replan = () => { clearPlan(); generate() }
-  const toggle = (id) => setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
+  const replan = () => { clearPlan(); setWelcomeBack(0); generate() }
+
+  // Persist completion so it survives a refresh (and feeds tomorrow's carry-over).
+  const toggle = (id) => setTasks((ts) => {
+    const next = ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+    savePlan({ tasks: next, goalProgress: meta.goalProgress, pace: meta.pace })
+    return next
+  })
+
   const remaining = tasks.filter((t) => !t.done).length
   const totalMin = tasks.reduce((s, t) => s + (t.minutes || 0), 0)
 
@@ -76,6 +92,16 @@ export default function Today() {
         <h1 className="text-3xl md:text-[2.5rem] font-medium leading-tight mb-3" style={{ color: 'var(--text)' }}>
           {greeting()}{name ? `, ${name}` : ''}.
         </h1>
+
+        {/* Welcome back after a gap, gentle and guilt-free */}
+        {status === 'ready' && welcomeBack > 0 && (
+          <div className="flex items-start gap-2 mb-5 px-3.5 py-2.5 rounded-2xl" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)' }}>
+            <Heart size={14} style={{ color: 'var(--primary)' }} className="mt-0.5 shrink-0" />
+            <p className="text-xs" style={{ color: 'var(--text)' }}>
+              Welcome back. It's been {welcomeBack} days, so today is kept light. No catching up, just a gentle restart.
+            </p>
+          </div>
+        )}
 
         {status === 'rest' && (
           <div className="py-6 text-center">

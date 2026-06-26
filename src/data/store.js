@@ -1,5 +1,4 @@
-// Local store. Today it's localStorage; later this becomes the user's account
-// (GET/PUT /api/me/profile, /api/today). The AI plan engine reads the profile.
+// Local store. Today it's localStorage; later this becomes the user's account.
 const KEY = 'logr-profile'
 const PLAN_KEY = 'logr-plan'
 
@@ -14,14 +13,17 @@ export function isOnboarded() {
   return localStorage.getItem('logr-onboarded') === '1'
 }
 
-// Today's plan is cached so it doesn't regenerate on every visit. Keyed by date,
-// so it naturally refreshes tomorrow. "Re-plan" clears it.
-export function getCachedPlan() {
-  try {
-    const v = JSON.parse(localStorage.getItem(PLAN_KEY))
-    return v && v.date === new Date().toDateString() ? v.plan : null
-  } catch { return null }
+// The raw stored plan, with the date it was made for (used to carry work forward).
+export function getRawPlan() {
+  try { return JSON.parse(localStorage.getItem(PLAN_KEY)) } catch { return null }
 }
+// Today's plan only (with its saved completion state), or null on a new day.
+export function getCachedPlan() {
+  const raw = getRawPlan()
+  return raw && raw.date === new Date().toDateString() ? raw.plan : null
+}
+// Save (or update) today's plan. Called on generate and on every check-off,
+// so completion survives a refresh.
 export function savePlan(plan) {
   localStorage.setItem(PLAN_KEY, JSON.stringify({ date: new Date().toDateString(), plan }))
 }
