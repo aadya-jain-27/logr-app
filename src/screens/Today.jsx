@@ -46,7 +46,7 @@ export default function Today() {
     setStatus('loading')
     const plan = await requestPlan({
       goal: profile.goal, deadline: profile.deadline, minutesToday: cap.minutes,
-      dayType: cap.dayType, material: profile.material, carriedOver, daysAway,
+      dayType: cap.dayType, material: profile.material, resources: profile.resources, carriedOver, daysAway,
       date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     })
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length && !plan.error) {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Plus, Check, Minus, X, Sparkles, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Plus, Check, Minus, X, Sparkles, BookOpen, Clock } from 'lucide-react'
 import { SCENES } from '../scenes/scenes'
 import { useScene } from '../theme'
 import { saveProfile } from '../data/store'
@@ -33,9 +33,10 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [p, setP] = useState({
     name: '', goal: '', deadline: '', weekday: 2, weekend: 4,
-    commitments: [], skipWeekends: false, vacation: { from: '', to: '' }, material: '',
+    commitments: [], skipWeekends: false, vacation: { from: '', to: '' }, resources: [], material: '',
   })
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
+  const [nr, setNr] = useState({ name: '', hours: '' })
   const set = (patch) => setP((prev) => ({ ...prev, ...patch }))
 
   const canNext = step === 1 ? p.goal.trim().length > 0 : true
@@ -47,6 +48,11 @@ export default function Onboarding() {
     if (!nc.name.trim() || !nc.date) return
     set({ commitments: [...p.commitments, nc] })
     setNc({ name: '', date: '', type: 'Exam' })
+  }
+  const addResource = () => {
+    if (!nr.name.trim()) return
+    set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim() }] })
+    setNr({ name: '', hours: '' })
   }
 
   return (
@@ -153,15 +159,35 @@ export default function Onboarding() {
               </div>
             )}
 
-            {/* 4. Material */}
+            {/* 4. Resources */}
             {step === 4 && (
               <div>
-                <h1 className="text-3xl md:text-4xl font-medium mb-2" style={{ color: 'var(--text)' }}>Got a syllabus or course?</h1>
-                <p className="text-soft text-[15px] mb-5">Paste your topics or drop a file, and Logr will split it into a day by day plan. Totally optional, you can add it anytime.</p>
-                <textarea className="field w-full px-4 py-3 text-sm outline-none resize-none mb-3" rows={5} placeholder={'Paste topics, one per line:\nLinear regression\nLogistic regression\nNeural networks...'} value={p.material} onChange={(e) => set({ material: e.target.value })} />
-                <button className="chip w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm hover:scale-[1.01] transition-transform" style={{ color: 'var(--text-soft)' }}>
-                  <Upload size={15} /> Or upload a PDF or course link
-                </button>
+                <h1 className="text-3xl md:text-4xl font-medium mb-2" style={{ color: 'var(--text)' }}>What are you learning from?</h1>
+                <p className="text-soft text-[15px] mb-5">Add your courses, videos, or books. Length is optional. If you skip it we'll estimate, and we'll plan the next bit each day rather than cram it all in. Totally optional.</p>
+                <div className="flex gap-2 mb-3">
+                  <input className="field flex-1 px-3 py-2.5 text-sm outline-none" placeholder="e.g. Andrew Ng ML Course 1 (Coursera)" value={nr.name} onChange={(e) => setNr({ ...nr, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
+                  <input className="field w-20 px-3 py-2.5 text-sm outline-none text-center" placeholder="~hrs" value={nr.hours} onChange={(e) => setNr({ ...nr, hours: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
+                  <button onClick={addResource} className="btn-primary w-10 h-[42px] rounded-xl flex items-center justify-center shrink-0"><Plus size={16} /></button>
+                </div>
+                {p.resources.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {p.resources.map((r, i) => (
+                      <div key={i} className="chip rounded-xl px-3 py-2.5 flex items-center justify-between text-sm gap-2">
+                        <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--text)' }}>
+                          <BookOpen size={14} className="shrink-0" style={{ color: 'var(--primary)' }} />
+                          <span className="truncate">{r.name}</span>
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {r.hours
+                            ? <span className="text-soft text-xs flex items-center gap-1"><Clock size={11} /> {r.hours}</span>
+                            : <span className="text-soft text-xs" style={{ opacity: 0.65 }}>we'll estimate</span>}
+                          <button onClick={() => set({ resources: p.resources.filter((_, j) => j !== i) })}><X size={13} className="text-soft" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <textarea className="field w-full px-4 py-3 text-sm outline-none resize-none" rows={3} placeholder={'Anything else to weave in? Extra topics or notes (optional)'} value={p.material} onChange={(e) => set({ material: e.target.value })} />
               </div>
             )}
 
@@ -175,7 +201,7 @@ export default function Onboarding() {
                 </p>
                 <div className="chip rounded-2xl px-4 py-3 text-left text-sm inline-block">
                   <div style={{ color: 'var(--text)' }} className="font-medium mb-1">{p.goal || 'Your goal'}</div>
-                  <div className="text-soft text-xs">{p.weekday}h weekdays, {p.weekend}h weekends{p.deadline ? `, ${p.deadline}` : ''}</div>
+                  <div className="text-soft text-xs">{p.weekday}h weekdays, {p.weekend}h weekends{p.deadline ? `, ${p.deadline}` : ''}{p.resources.length ? `, ${p.resources.length} resource${p.resources.length > 1 ? 's' : ''}` : ''}</div>
                 </div>
               </div>
             )}
