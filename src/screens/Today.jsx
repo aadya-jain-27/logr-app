@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Navigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Check, Clock, Sparkles, Pause, RefreshCw, Coffee, CloudOff, Heart } from 'lucide-react'
-import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan } from '../data/store'
-import { requestPlan, todayCapacity } from '../lib/plan'
+import { Navigate, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass } from 'lucide-react'
+import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay } from '../data/store'
+import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
+import { useFocus } from '../focus'
 
 function greeting() {
   const h = new Date().getHours()
@@ -12,10 +13,19 @@ function greeting() {
   return 'Good evening'
 }
 
-const withIds = (tasks) => tasks.map((t, i) => ({ id: `t${i}`, done: false, ...t }))
+// Guard against the model repeating a task: keep the first of each title.
+const dedupeTasks = (tasks) => {
+  const seen = new Set()
+  return (tasks || []).filter((t) => {
+    const k = (t.title || '').trim().toLowerCase()
+    if (!k || seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+}
+const withIds = (tasks) => dedupeTasks(tasks).map((t, i) => ({ id: `t${i}`, done: false, ...t }))
 const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 
-// What did a previous day leave unfinished, and how long ago was it?
 function carryFromPrevious() {
   const raw = getRawPlan()
   const today = new Date().toDateString()
@@ -26,54 +36,94 @@ function carryFromPrevious() {
 }
 
 export default function Today() {
+  // All hooks MUST come before any conditional returns.
+  const { open: openFocus } = useFocus()
+
   const profile = getProfile()
-  if (!profile) return <Navigate to="/welcome" replace />
+  const name = profile?.name?.trim()
+  const goal = profile?.goal?.trim() || 'your goal'
+  const cap = profile ? todayCapacity(profile) : { minutes: 0, rest: false, dayType: '' }
 
-  const name = profile.name?.trim()
-  const goal = profile.goal?.trim() || 'your goal'
-  const cap = todayCapacity(profile)
-
-  const [status, setStatus] = useState('loading') // loading | ready | rest | error
+  const [status, setStatus] = useState('loading')
   const [tasks, setTasks] = useState([])
-  const [meta, setMeta] = useState({ goalProgress: null, pace: null })
+  const [meta, setMeta] = useState({ goalProgress: null, pace: null, acknowledgements: [] })
   const [errKind, setErrKind] = useState(null)
-  const [welcomeBack, setWelcomeBack] = useState(0) // days away, 0 if none
+  const [welcomeBack, setWelcomeBack] = useState(0)
+  const [confirmReplan, setConfirmReplan] = useState(false)
+  const [fallbackTasks, setFallbackTasks] = useState([])
+  const [expandedTips, setExpandedTips] = useState(new Set())
+  const [carriedTasks, setCarriedTasks] = useState([])
+  const [path, setPath] = useState(() => pathDay(profile))
 
   const generate = useCallback(async () => {
+    if (!profile) return
     if (cap.rest) { setStatus('rest'); return }
     const { carriedOver, daysAway } = carryFromPrevious()
     setWelcomeBack(daysAway >= 2 ? daysAway : 0)
+    setCarriedTasks(carriedOver)
     setStatus('loading')
     const plan = await requestPlan({
       goal: profile.goal, deadline: profile.deadline, minutesToday: cap.minutes,
-      dayType: cap.dayType, material: profile.material, resources: profile.resources, carriedOver, daysAway,
+      dayType: cap.dayType, resources: profile.resources, carriedOver, daysAway,
       date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     })
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length && !plan.error) {
-      const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null }
+      const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null, acknowledgements: Array.isArray(plan.acknowledgements) ? plan.acknowledgements : [] }
       savePlan(stored)
-      setTasks(stored.tasks); setMeta({ goalProgress: stored.goalProgress, pace: stored.pace }); setStatus('ready')
+      setTasks(stored.tasks)
+      setMeta({ goalProgress: stored.goalProgress, pace: stored.pace, acknowledgements: stored.acknowledgements })
+      setStatus('ready')
     } else {
-      setErrKind(plan?.error === 'no_key' ? 'no_key' : 'failed'); setStatus('error')
+      setErrKind(plan?.error === 'no_key' ? 'no_key' : 'failed')
+      const yp = getYesterdayPlan()
+      if (yp?.tasks?.length) setFallbackTasks(withIds(yp.tasks))
+      setStatus('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cap.minutes, cap.rest, cap.dayType])
+  }, [cap.minutes, cap.rest, cap.dayType, profile])
 
   useEffect(() => {
+    if (!profile) return
     if (cap.rest) { setStatus('rest'); return }
     const cached = getCachedPlan()
     if (cached?.tasks?.length) {
-      setTasks(withIds(cached.tasks)); setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null }); setStatus('ready')
+      setTasks(withIds(cached.tasks))
+      setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null, acknowledgements: Array.isArray(cached.acknowledgements) ? cached.acknowledgements : [] })
+      setStatus('ready')
     } else { generate() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const replan = () => { clearPlan(); setWelcomeBack(0); generate() }
+  // Quietly shape the overall path once, so "day N" and the path view are ready to glance at.
+  useEffect(() => {
+    if (!profile || status !== 'ready') return
+    if (getValidRoadmap(profile)) { setPath(pathDay(profile)); return }
+    let cancelled = false
+    requestRoadmap({
+      goal: profile.goal, deadline: profile.deadline,
+      weekdayHours: profile.weekday, weekendHours: profile.weekend, resources: profile.resources,
+    }).then((r) => {
+      if (cancelled || !r || !Array.isArray(r.phases) || !r.phases.length || r.error) return
+      saveRoadmap(profile, r)
+      setPath(pathDay(profile))
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
-  // Persist completion so it survives a refresh (and feeds tomorrow's carry-over).
+  // NOW it's safe to conditionally return — all hooks are above this line.
+  if (!profile) return <Navigate to="/welcome" replace />
+
+  const replan = () => {
+    setConfirmReplan(false)
+    clearPlan()
+    setWelcomeBack(0)
+    setFallbackTasks([])
+    generate()
+  }
+
   const toggle = (id) => setTasks((ts) => {
     const next = ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    savePlan({ tasks: next, goalProgress: meta.goalProgress, pace: meta.pace })
+    savePlan({ tasks: next, goalProgress: meta.goalProgress, pace: meta.pace, acknowledgements: meta.acknowledgements })
     return next
   })
 
@@ -93,13 +143,25 @@ export default function Today() {
           {greeting()}{name ? `, ${name}` : ''}.
         </h1>
 
-        {/* Welcome back after a gap, gentle and guilt-free */}
         {status === 'ready' && welcomeBack > 0 && (
-          <div className="flex items-start gap-2 mb-5 px-3.5 py-2.5 rounded-2xl" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)' }}>
-            <Heart size={14} style={{ color: 'var(--primary)' }} className="mt-0.5 shrink-0" />
-            <p className="text-xs" style={{ color: 'var(--text)' }}>
-              Welcome back. It's been {welcomeBack} days, so today is kept light. No catching up, just a gentle restart.
-            </p>
+          <div className="mb-5 px-3.5 py-3 rounded-2xl" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)' }}>
+            <div className="flex items-start gap-2">
+              <Heart size={14} style={{ color: 'var(--primary)' }} className="mt-0.5 shrink-0" />
+              <p className="text-xs" style={{ color: 'var(--text)' }}>
+                Welcome back. It's been {welcomeBack} {welcomeBack === 1 ? 'day' : 'days'}, so today is kept light.
+              </p>
+            </div>
+            {carriedTasks.length > 0 && (
+              <div className="mt-2 ml-5 space-y-1">
+                <p className="text-xs text-soft">Rolled over from before:</p>
+                {carriedTasks.map((t, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-soft)' }}>
+                    <span className="w-1 h-1 rounded-full shrink-0" style={{ background: 'var(--primary)', opacity: 0.5 }} />
+                    {t}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -125,15 +187,35 @@ export default function Today() {
         )}
 
         {status === 'error' && (
-          <div className="py-8 text-center">
-            <CloudOff size={26} style={{ color: 'var(--text-soft)' }} className="mx-auto mb-3" />
-            <p className="text-[15px]" style={{ color: 'var(--text)' }}>
-              {errKind === 'no_key' ? 'Planning is not connected yet.' : "I couldn't shape today's plan just now."}
-            </p>
-            <p className="text-soft text-sm mt-1 mb-5">
-              {errKind === 'no_key' ? 'Add a Gemini key to .env to turn on planning.' : 'It might be a brief hiccup. Try again in a moment.'}
-            </p>
-            <button onClick={replan} className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"><RefreshCw size={14} /> Try again</button>
+          <div className="py-6">
+            <div className="text-center mb-4">
+              <CloudOff size={26} style={{ color: 'var(--text-soft)' }} className="mx-auto mb-3" />
+              <p className="text-[15px]" style={{ color: 'var(--text)' }}>
+                {errKind === 'no_key' ? 'Planning is not connected yet.' : "Couldn't reach Gemini right now."}
+              </p>
+              <p className="text-soft text-sm mt-1 mb-4">
+                {errKind === 'no_key' ? 'Add a Gemini key to .env to turn on planning.' : 'It might be a brief hiccup. Try again in a moment.'}
+              </p>
+              <button onClick={generate} className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"><RefreshCw size={14} /> Try again</button>
+            </div>
+            {fallbackTasks.length > 0 && (
+              <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--panel-border)' }}>
+                <div className="flex items-center gap-1.5 text-xs text-soft mb-3">
+                  <AlertTriangle size={12} /> Showing your previous plan while offline
+                </div>
+                <div className="space-y-2">
+                  {fallbackTasks.map((t) => (
+                    <div key={t.id} className="chip rounded-xl p-3 flex items-start gap-3 opacity-70">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t.title}</div>
+                        <div className="text-soft text-xs mt-0.5">{t.kind}{t.source && !/^https?:\/\//.test(t.source) ? `, ${t.source}` : ''}</div>
+                      </div>
+                      <span className="text-xs shrink-0" style={{ color: 'var(--text-soft)' }}>{t.minutes}m</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -145,6 +227,18 @@ export default function Today() {
                 : <>Just <span style={{ color: 'var(--text)', fontWeight: 600 }}>{remaining} {remaining === 1 ? 'thing' : 'things'}</span> today. That's all you need to think about.</>}
             </p>
 
+            {/* Confirm the student's pacing requests were honored, so they know they were heard. */}
+            {meta.acknowledgements?.length > 0 && (
+              <div className="space-y-1.5 mb-5">
+                {meta.acknowledgements.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-soft)' }}>
+                    <Check size={13} style={{ color: 'var(--primary)' }} className="mt-0.5 shrink-0" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 mb-5 flex-wrap">
               <span className="chip flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full">
                 <Clock size={13} /> about {Math.round((totalMin / 60) * 10) / 10}h today
@@ -154,15 +248,26 @@ export default function Today() {
                   <Sparkles size={13} style={{ color: 'var(--primary)' }} /> {meta.goalProgress}% to {goal}{meta.pace ? `, ${meta.pace}` : ''}
                 </span>
               )}
+              {path && (
+                <Link to="/path" className="chip flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity" title="See the whole path">
+                  <Compass size={13} style={{ color: 'var(--primary)' }} /> Day {path.day}{path.total ? ` of ${path.total}` : ''}
+                </Link>
+              )}
             </div>
 
             <div className="space-y-2.5">
               {tasks.map((t, i) => (
-                <motion.button
-                  key={t.id} onClick={() => toggle(t.id)}
+                // div instead of button to allow nested <a> tags without HTML violations
+                <motion.div
+                  key={t.id}
+                  role="button" tabIndex={0}
+                  onClick={() => toggle(t.id)}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggle(t.id)}
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: t.done ? 0.55 : 1, y: 0 }}
-                  transition={{ delay: 0.05 + i * 0.07, duration: 0.5 }} whileTap={{ scale: 0.98 }}
-                  className="chip w-full text-left rounded-2xl p-4 flex items-start gap-3.5"
+                  transition={{ delay: 0.05 + i * 0.07, duration: 0.5 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="chip w-full text-left rounded-2xl p-4 flex items-start gap-3.5 cursor-pointer"
+                  style={{ userSelect: 'none' }}
                 >
                   <span className="shrink-0 mt-0.5 w-6 h-6 rounded-full flex items-center justify-center transition-all"
                     style={{ background: t.done ? 'var(--primary)' : 'transparent', border: t.done ? 'none' : '2px solid var(--text-soft)', color: 'var(--on-primary)' }}>
@@ -170,17 +275,78 @@ export default function Today() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[15px] font-semibold leading-snug" style={{ color: 'var(--text)', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</div>
-                    <div className="text-soft text-xs mt-0.5">{t.kind}{t.source ? `, ${t.source}` : ''}</div>
+                    <div className="text-soft text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      {t.kind}
+                      {t.source && (/^https?:\/\//.test(t.source) ? (
+                        <a href={t.source} target="_blank" rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="underline hover:opacity-75 transition-opacity"
+                          style={{ color: 'var(--primary)' }}>
+                          {/youtu/.test(t.source) ? 'Open in YouTube' : 'Open link'}
+                        </a>
+                      ) : `, ${t.source}`)}
+                    </div>
+                    {t.tip && (
+                      <div className="mt-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpandedTips((prev) => { const next = new Set(prev); next.has(t.id) ? next.delete(t.id) : next.add(t.id); return next }) }}
+                          className="flex items-center gap-1 text-xs transition-opacity hover:opacity-75"
+                          style={{ color: 'var(--primary)' }}
+                        >
+                          <ChevronDown size={12} style={{ transform: expandedTips.has(t.id) ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                          Where to start
+                        </button>
+                        <AnimatePresence>
+                          {expandedTips.has(t.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.22 }}
+                              className="overflow-hidden"
+                            >
+                              <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-soft)' }}>{t.tip}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
                   </div>
                   <span className="shrink-0 text-xs self-center" style={{ color: 'var(--text-soft)' }}>{t.minutes}m</span>
-                </motion.button>
+                </motion.div>
               ))}
             </div>
 
-            <div className="mt-6 flex items-center justify-center gap-5 text-sm text-soft">
-              <button className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"><Pause size={14} /> Break</button>
+            <div className="mt-6 flex items-center justify-center gap-4 text-sm text-soft flex-wrap">
+              <button
+                onClick={() => openFocus(tasks.find((t) => !t.done)?.title ?? null)}
+                className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"
+              >
+                <Timer size={14} /> Focus
+              </button>
               <span style={{ opacity: 0.35 }}>·</span>
-              <button onClick={replan} className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"><RefreshCw size={14} /> Re-plan</button>
+              <AnimatePresence mode="wait">
+                {confirmReplan ? (
+                  <motion.span key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="flex items-center gap-2">
+                    <span style={{ color: 'var(--text)' }}>Clear today's progress?</span>
+                    <button onClick={replan} className="underline" style={{ color: 'var(--primary)' }}>Yes</button>
+                    <button onClick={() => setConfirmReplan(false)} className="underline">Cancel</button>
+                  </motion.span>
+                ) : (
+                  <motion.button key="replan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    onClick={() => setConfirmReplan(true)}
+                    className="flex items-center gap-1.5 hover:opacity-75 transition-opacity">
+                    <RefreshCw size={14} /> Re-plan
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <span style={{ opacity: 0.35 }}>·</span>
+              <Link to="/share" className="flex items-center gap-1.5 hover:opacity-75 transition-opacity">
+                <Share2 size={14} /> Share
+              </Link>
+              <span style={{ opacity: 0.35 }}>·</span>
+              <Link to="/settings" className="flex items-center gap-1.5 hover:opacity-75 transition-opacity">
+                <Settings size={14} /> Settings
+              </Link>
             </div>
           </>
         )}

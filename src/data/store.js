@@ -2,6 +2,7 @@
 const KEY = 'logr-profile'
 const PLAN_KEY = 'logr-plan'
 const HISTORY_KEY = 'logr-history'
+const ROADMAP_KEY = 'logr-roadmap'
 
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
@@ -29,7 +30,53 @@ export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)
 }
 
-// ---- Progress history (for the month-at-a-glance) ----
+// The overall path (roadmap) behind the goal. Cached until the goal or resources change.
+function roadmapSignature(profile) {
+  const names = (profile?.resources || []).map((r) => r.name).join('|')
+  return `${profile?.goal || ''}::${profile?.deadline || ''}::${names}`
+}
+export function getRoadmap() {
+  try { return JSON.parse(localStorage.getItem(ROADMAP_KEY)) } catch { return null }
+}
+// Returns the cached roadmap only if it still matches the current profile.
+export function getValidRoadmap(profile) {
+  const saved = getRoadmap()
+  return saved && saved.sig === roadmapSignature(profile) ? saved : null
+}
+export function saveRoadmap(profile, roadmap) {
+  const sig = roadmapSignature(profile)
+  const prev = getRoadmap()
+  // Keep the original start date when the same path is refreshed, so "day N" stays honest.
+  const startDate = prev && prev.sig === sig ? prev.startDate : new Date().toDateString()
+  const record = { sig, startDate, roadmap }
+  localStorage.setItem(ROADMAP_KEY, JSON.stringify(record))
+  return record
+}
+export function clearRoadmap() {
+  localStorage.removeItem(ROADMAP_KEY)
+}
+// Which day of the path today is (1-indexed), plus the total span. Null if no matching roadmap.
+export function pathDay(profile) {
+  const saved = getValidRoadmap(profile)
+  if (!saved) return null
+  const total = Number(saved.roadmap?.totalDays) || null
+  const start = new Date(saved.startDate)
+  const atMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const n = Math.floor((atMidnight(new Date()) - atMidnight(start)) / 86400000) + 1
+  const day = total ? Math.min(Math.max(1, n), total) : Math.max(1, n)
+  return { day, total }
+}
+
+// Returns the most recent day's plan that isn't today (used as fallback when Gemini fails)
+export function getYesterdayPlan() {
+  try {
+    const raw = getRawPlan()
+    if (!raw || raw.date === new Date().toDateString()) return null
+    return raw.plan
+  } catch { return null }
+}
+
+// Progress history (for the month-at-a-glance)
 export function getHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || {} } catch { return {} }
 }

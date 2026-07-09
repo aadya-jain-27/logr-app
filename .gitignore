@@ -10,3 +10,4 @@ shots/
 !.env.example
 .vscode/*
 !.vscode/extensions.json
+.claude/

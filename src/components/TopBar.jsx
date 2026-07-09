@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Sprout, Volume2, VolumeX, CalendarHeart } from 'lucide-react'
+import { Sprout, Volume2, VolumeX, CalendarHeart, Settings, Compass } from 'lucide-react'
 import { useScene } from '../theme'
 import { SCENES, getScene } from '../scenes/scenes'
 
@@ -38,11 +38,25 @@ export default function TopBar() {
             })}
           </div>
           <Link
+            to="/path" title="The path"
+            className="panel w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-105"
+            style={{ color: 'var(--text)' }}
+          >
+            <Compass size={16} />
+          </Link>
+          <Link
             to="/journey" title="Your progress"
             className="panel w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-105"
             style={{ color: 'var(--text)' }}
           >
             <CalendarHeart size={16} />
+          </Link>
+          <Link
+            to="/settings" title="Settings"
+            className="panel w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-105"
+            style={{ color: 'var(--text)' }}
+          >
+            <Settings size={16} />
           </Link>
           <button
             onClick={() => setSound((v) => !v)}
