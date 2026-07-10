@@ -145,7 +145,8 @@ export async function parseFile(key, buffer, mimeType) {
         { file_data: { mime_type: mimeType, file_uri: file.uri } },
         { text: 'Analyse this document. Return JSON: { "title": string, "pageCount": number, "topics": string[], "summary": string (2 to 3 sentences) }. Nothing else.' }
       ]}],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+      // No thinking budget: this is metadata extraction, so keep it fast.
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
     }),
   })
   const data = await genRes.json()

@@ -31,6 +31,7 @@ export default function Settings() {
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
   const [saved, setSaved] = useState(false)
   const [notifyPerm, setNotifyPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
+  const [confirmReset, setConfirmReset] = useState(false)
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -93,8 +94,13 @@ export default function Settings() {
           </div>
 
           <div>
-            <label className={label} style={{ color: 'var(--text)' }}>Target date</label>
-            <input type="date" className={field} value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+            <label className={label} style={{ color: 'var(--text)' }}>Target timeframe</label>
+            <input className={field} value={form.deadline} onChange={(e) => set('deadline', e.target.value)} placeholder="e.g. In 6 months, or by end of semester" />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {['In 1 month', 'In 3 months', 'In 6 months', 'By end of semester'].map((d) => (
+                <button key={d} onClick={() => set('deadline', d)} className="text-xs px-3 py-1.5 rounded-full transition-colors" style={{ background: form.deadline === d ? 'var(--primary)' : 'var(--chip)', color: form.deadline === d ? 'var(--on-primary)' : 'var(--text-soft)', border: '1px solid var(--panel-border)' }}>{d}</button>
+              ))}
+            </div>
           </div>
 
           {/* Hours */}
@@ -275,6 +281,18 @@ export default function Settings() {
         >
           {saved ? <><Check size={16} strokeWidth={3} /> Saved</> : 'Save changes'}
         </button>
+
+        <div className="text-center mt-4">
+          {confirmReset ? (
+            <span className="text-sm inline-flex items-center gap-2 flex-wrap justify-center" style={{ color: 'var(--text-soft)' }}>
+              Clear your goal, plan, and progress?
+              <button onClick={() => { localStorage.clear(); navigate('/welcome') }} className="underline" style={{ color: 'var(--primary)' }}>Yes, start over</button>
+              <button onClick={() => setConfirmReset(false)} className="underline">Cancel</button>
+            </span>
+          ) : (
+            <button onClick={() => setConfirmReset(true)} className="text-sm hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}>Start over</button>
+          )}
+        </div>
       </motion.div>
     </div>
   )

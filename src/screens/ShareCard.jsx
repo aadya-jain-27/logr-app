@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Check, Clock, Sparkles, X } from 'lucide-react'
 import { getCachedPlan, getProfile } from '../data/store'
@@ -23,12 +24,15 @@ export default function ShareCard() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-5 pt-20 pb-10">
-      {/* Close button */}
-      <button onClick={() => navigate('/today')}
-        className="fixed top-6 right-6 z-50 w-10 h-10 rounded-full flex items-center justify-center panel hover:opacity-75 transition-opacity"
-        style={{ color: 'var(--text)' }}>
-        <X size={16} />
-      </button>
+      {/* Close button, portaled to body so the top bar's stacking context can't intercept the click */}
+      {createPortal(
+        <button onClick={() => navigate('/today')}
+          className="fixed top-6 right-6 z-[60] w-10 h-10 rounded-full flex items-center justify-center panel hover:opacity-75 transition-opacity"
+          style={{ color: 'var(--text)' }} aria-label="Back to today">
+          <X size={16} />
+        </button>,
+        document.body,
+      )}
 
       <p className="text-soft text-sm mb-4">Screenshot this to share your plan</p>
 
