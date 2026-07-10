@@ -64,9 +64,15 @@ export default function Today() {
     setWelcomeBack(daysAway >= 2 ? daysAway : 0)
     setCarriedTasks(carriedOver)
     setStatus('loading')
+    const todayStr = new Date().toDateString()
+    const todaysCommitments = (profile.commitments || [])
+      .filter((c) => c.date && new Date(c.date + 'T00:00:00').toDateString() === todayStr)
+      .map((c) => ({ name: c.name, type: c.type }))
+    // On a day with an exam or deadline, actually cut the study budget so today is genuinely lighter.
+    const minutesToday = todaysCommitments.length ? Math.max(30, Math.round(cap.minutes / 2)) : cap.minutes
     const plan = await requestPlan({
-      goal: profile.goal, deadline: profile.deadline, minutesToday: cap.minutes,
-      dayType: cap.dayType, resources: profile.resources, carriedOver, daysAway,
+      goal: profile.goal, deadline: profile.deadline, minutesToday,
+      dayType: cap.dayType, resources: profile.resources, carriedOver, daysAway, todaysCommitments,
       date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     })
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length && !plan.error) {

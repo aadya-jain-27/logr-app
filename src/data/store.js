@@ -22,7 +22,9 @@ function resourcesSig(resources) {
   return (resources || []).map((r) => `${r.name}~${r.hours || ''}~${r.notes || ''}~${r.done ? 'd' : ''}`).join('|')
 }
 function planSignature(p) {
-  return `${p?.goal || ''}::${p?.deadline || ''}::${resourcesSig(p?.resources)}::${p?.weekday ?? p?.wkday ?? ''}::${p?.weekend ?? p?.wkend ?? ''}`
+  const today = new Date().toDateString()
+  const todayCommits = (p?.commitments || []).filter((c) => c.date && new Date(c.date + 'T00:00:00').toDateString() === today).map((c) => c.name).join(',')
+  return `${p?.goal || ''}::${p?.deadline || ''}::${resourcesSig(p?.resources)}::${p?.weekday ?? p?.wkday ?? ''}::${p?.weekend ?? p?.wkend ?? ''}::${todayCommits}`
 }
 export function getRawPlan() {
   try { return JSON.parse(localStorage.getItem(PLAN_KEY)) } catch { return null }

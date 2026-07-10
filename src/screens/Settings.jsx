@@ -24,9 +24,11 @@ export default function Settings() {
     scene: raw?.scene || 'sunset',
     notifyAt: raw?.notifyAt || '',
     resources: (raw?.resources || []).map((r) => ({ ...r, done: r.done ?? false })),
+    commitments: raw?.commitments || [],
   })
 
   const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '' })
+  const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
   const [saved, setSaved] = useState(false)
   const [notifyPerm, setNotifyPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
 
@@ -40,6 +42,13 @@ export default function Settings() {
 
   const toggleDone = (i) => set('resources', form.resources.map((r, idx) => idx === i ? { ...r, done: !r.done } : r))
   const removeResource = (i) => set('resources', form.resources.filter((_, idx) => idx !== i))
+
+  const addCommit = () => {
+    if (!nc.name.trim() || !nc.date) return
+    set('commitments', [...form.commitments, nc])
+    setNc({ name: '', date: '', type: 'Exam' })
+  }
+  const removeCommit = (i) => set('commitments', form.commitments.filter((_, idx) => idx !== i))
 
   const enableNotifications = async () => {
     const perm = await requestPermission()
@@ -198,6 +207,36 @@ export default function Settings() {
               )}
             </div>
             <p className="text-xs text-soft mt-2">Check a resource to mark it complete. Completed resources won't be planned.</p>
+          </div>
+
+          {/* Commitments */}
+          <div>
+            <label className={label} style={{ color: 'var(--text)' }}>Exams and deadlines</label>
+            {form.commitments.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {form.commitments.map((c, i) => (
+                  <div key={i} className="chip rounded-xl px-3.5 py-2.5 flex items-center justify-between text-sm">
+                    <span style={{ color: 'var(--text)' }}><span className="text-soft text-xs mr-2">{c.type}</span>{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-soft text-xs">{c.date}</span>
+                      <button onClick={() => removeCommit(i)}><Trash2 size={13} className="text-soft" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {['Exam', 'Assignment', 'Presentation'].map((t) => {
+                const on = nc.type === t
+                return <button key={t} onClick={() => setNc({ ...nc, type: t })} className="text-xs px-3 py-1.5 rounded-full" style={{ background: on ? 'var(--primary)' : 'var(--chip)', color: on ? 'var(--on-primary)' : 'var(--text-soft)', border: '1px solid var(--panel-border)' }}>{t}</button>
+              })}
+            </div>
+            <div className="flex gap-2">
+              <input className={`${field} flex-1`} placeholder="e.g. Maths midterm" value={nc.name} onChange={(e) => setNc({ ...nc, name: e.target.value })} />
+              <input type="date" className={field} style={{ width: 'auto' }} value={nc.date} onChange={(e) => setNc({ ...nc, date: e.target.value })} />
+              <button onClick={addCommit} className="btn-primary w-10 rounded-xl flex items-center justify-center shrink-0"><Plus size={16} /></button>
+            </div>
+            <p className="text-xs text-soft mt-2">We mark these on your calendar and keep those days lighter.</p>
           </div>
 
           {/* Daily reminder */}
