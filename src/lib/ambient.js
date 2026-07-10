@@ -1,9 +1,11 @@
-// Procedural scene ambience with the Web Audio API. No audio files: rain, waves,
-// wind, and soft birdsong are synthesised, so it works offline and ships tiny.
+// Procedural scene ambience with the Web Audio API. No audio files.
+// Rain is pure rain. Every other world is gentle, peaceful music: a soft chord pad
+// that hums and breathes, bell chimes here and there, and a quiet wind or water bed.
+// Each world sits in its own musical key so they feel distinct.
 
 let ctx = null
 let nodes = null
-let chirpTimer = null
+let chimeTimer = null
 
 function noiseBuffer(context, kind) {
   const len = Math.floor(context.sampleRate * 2.5)
@@ -18,93 +20,118 @@ function noiseBuffer(context, kind) {
   return buffer
 }
 
-// Tuned to sit calmly in the background, never intrusive.
-// rain = bright bandpassed noise, waves/wind = low brown noise with a slow swell, birds = soft chirps.
+// pad = the chord that hums, chimes = notes that ring here and there (Hz).
 const CONFIG = {
-  rainy: { noise: 'white', type: 'bandpass', freq: 2200, q: 0.7, gain: 0.10, swell: null, chirp: false },
-  ocean: { noise: 'brown', type: 'lowpass', freq: 480, q: 0.6, gain: 0.20, swell: { rate: 0.09, depth: 0.7 }, chirp: false },
-  lakeside: { noise: 'brown', type: 'lowpass', freq: 700, q: 0.6, gain: 0.11, swell: { rate: 0.13, depth: 0.4 }, chirp: true },
-  sunset: { noise: 'brown', type: 'lowpass', freq: 820, q: 0.5, gain: 0.08, swell: { rate: 0.05, depth: 0.3 }, chirp: true },
-  winter: { noise: 'brown', type: 'lowpass', freq: 560, q: 0.4, gain: 0.11, swell: { rate: 0.06, depth: 0.45 }, chirp: false },
-  lavender: { noise: 'brown', type: 'lowpass', freq: 760, q: 0.5, gain: 0.08, swell: { rate: 0.1, depth: 0.3 }, chirp: true },
+  rainy: { kind: 'rain', noise: 'white', filter: 2200, q: 0.7, noiseGain: 0.11 },
+  winter: { kind: 'music', noise: 'brown', filter: 480, q: 0.4, noiseGain: 0.08, swell: { rate: 0.05, depth: 0.4 },
+    pad: [130.81, 196.00, 261.63], chimes: [261.63, 293.66, 392.00, 523.25], chimeEvery: [8000, 15000], padGain: 0.05, chimeGain: 0.08 },
+  lakeside: { kind: 'music', noise: 'brown', filter: 700, q: 0.6, noiseGain: 0.06, swell: { rate: 0.12, depth: 0.4 },
+    pad: [261.63, 329.63, 392.00], chimes: [523.25, 587.33, 659.25, 783.99, 880.00], chimeEvery: [6000, 12000], padGain: 0.045, chimeGain: 0.07 },
+  sunset: { kind: 'music', noise: 'brown', filter: 820, q: 0.5, noiseGain: 0.05, swell: { rate: 0.05, depth: 0.3 },
+    pad: [220.00, 277.18, 329.63], chimes: [440.00, 554.37, 659.25, 880.00], chimeEvery: [6000, 13000], padGain: 0.05, chimeGain: 0.07 },
+  lavender: { kind: 'music', noise: 'brown', filter: 760, q: 0.5, noiseGain: 0.05, swell: { rate: 0.10, depth: 0.3 },
+    pad: [293.66, 329.63, 440.00], chimes: [587.33, 659.25, 739.99, 880.00], chimeEvery: [6000, 13000], padGain: 0.045, chimeGain: 0.07 },
+  ocean: { kind: 'music', noise: 'brown', filter: 500, q: 0.6, noiseGain: 0.13, swell: { rate: 0.08, depth: 0.7 },
+    pad: [110.00, 164.81, 220.00], chimes: [220.00, 329.63, 440.00, 659.25], chimeEvery: [9000, 16000], padGain: 0.05, chimeGain: 0.09 },
 }
 
-function playChirp() {
-  if (!ctx) return
+function playChime(freq, gainAmt) {
+  if (!ctx || !nodes) return
   const now = ctx.currentTime
-  const base = 1700 + Math.random() * 1400
-  const notes = Math.random() < 0.5 ? 2 : 3
-  for (let n = 0; n < notes; n++) {
+  // bell timbre: fundamental plus two quieter harmonics, quick attack, long decay
+  ;[[1, 1], [2, 0.4], [3, 0.15]].forEach(([mult, amp]) => {
     const o = ctx.createOscillator()
     const g = ctx.createGain()
     o.type = 'sine'
-    const t = now + n * 0.12
-    const f = base * (1 + n * 0.06)
-    o.frequency.setValueAtTime(f, t)
-    o.frequency.linearRampToValueAtTime(f * 1.12, t + 0.06)
-    g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(0.035, t + 0.02)
-    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22)
-    o.connect(g).connect(ctx.destination)
-    o.start(t)
-    o.stop(t + 0.24)
-  }
+    o.frequency.value = freq * mult
+    const peak = gainAmt * amp
+    g.gain.setValueAtTime(0, now)
+    g.gain.linearRampToValueAtTime(peak, now + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0006, now + 2.6)
+    o.connect(g).connect(nodes.master)
+    o.start(now)
+    o.stop(now + 2.7)
+  })
 }
 
-function scheduleChirp() {
-  chirpTimer = setTimeout(() => {
-    if (ctx && nodes) { playChirp(); scheduleChirp() }
-  }, 5000 + Math.random() * 9000)
+function scheduleChime(cfg) {
+  const [min, max] = cfg.chimeEvery
+  chimeTimer = setTimeout(() => {
+    if (ctx && nodes) {
+      playChime(cfg.chimes[Math.floor(Math.random() * cfg.chimes.length)], cfg.chimeGain)
+      scheduleChime(cfg)
+    }
+  }, min + Math.random() * (max - min))
 }
 
 export function startAmbient(sceneId) {
   stopAmbient()
   const cfg = CONFIG[sceneId] || CONFIG.sunset
-  try {
-    ctx = new (window.AudioContext || window.webkitAudioContext)()
-  } catch { ctx = null; return }
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)() } catch { ctx = null; return }
   ctx.resume?.().catch(() => {})
 
+  const master = ctx.createGain()
+  master.gain.value = 0
+  master.connect(ctx.destination)
+  master.gain.linearRampToValueAtTime(1, ctx.currentTime + 2)
+  nodes = { master, oscs: [] }
+
+  // wind / water / rain bed
   const src = ctx.createBufferSource()
   src.buffer = noiseBuffer(ctx, cfg.noise)
   src.loop = true
-  const filter = ctx.createBiquadFilter()
-  filter.type = cfg.type
-  filter.frequency.value = cfg.freq
-  filter.Q.value = cfg.q
-  const gain = ctx.createGain()
-  gain.gain.value = 0
-  src.connect(filter).connect(gain).connect(ctx.destination)
+  const nf = ctx.createBiquadFilter()
+  nf.type = cfg.kind === 'rain' ? 'bandpass' : 'lowpass'
+  nf.frequency.value = cfg.filter
+  nf.Q.value = cfg.q
+  const ng = ctx.createGain()
+  ng.gain.value = cfg.noiseGain
+  src.connect(nf).connect(ng).connect(master)
   src.start()
-  gain.gain.linearRampToValueAtTime(cfg.gain, ctx.currentTime + 2)
-
   if (cfg.swell) {
-    const lfo = ctx.createOscillator()
-    lfo.frequency.value = cfg.swell.rate
-    const lfoGain = ctx.createGain()
-    lfoGain.gain.value = cfg.gain * cfg.swell.depth
-    lfo.connect(lfoGain).connect(gain.gain)
-    lfo.start()
+    const lfo = ctx.createOscillator(); lfo.frequency.value = cfg.swell.rate
+    const lg = ctx.createGain(); lg.gain.value = cfg.noiseGain * cfg.swell.depth
+    lfo.connect(lg).connect(ng.gain); lfo.start()
+    nodes.oscs.push(lfo)
   }
-  nodes = { src, gain }
-  if (cfg.chirp) scheduleChirp()
+
+  if (cfg.kind === 'music') {
+    const padFilter = ctx.createBiquadFilter()
+    padFilter.type = 'lowpass'; padFilter.frequency.value = 1400
+    const padGain = ctx.createGain(); padGain.gain.value = cfg.padGain
+    padFilter.connect(padGain).connect(master)
+    // slow tremolo so the chord gently breathes
+    const trem = ctx.createOscillator(); trem.frequency.value = 0.07
+    const tremGain = ctx.createGain(); tremGain.gain.value = cfg.padGain * 0.5
+    trem.connect(tremGain).connect(padGain.gain); trem.start()
+    nodes.oscs.push(trem)
+    // the chord itself, each note doubled and slightly detuned for warmth
+    cfg.pad.forEach((f) => {
+      [-4, 4].forEach((cents) => {
+        const o = ctx.createOscillator()
+        o.type = 'sine'; o.frequency.value = f; o.detune.value = cents
+        o.connect(padFilter); o.start()
+        nodes.oscs.push(o)
+      })
+    })
+    scheduleChime(cfg)
+  }
 }
 
 export function stopAmbient() {
-  if (chirpTimer) { clearTimeout(chirpTimer); chirpTimer = null }
-  const closingCtx = ctx
-  const closingNodes = nodes
+  if (chimeTimer) { clearTimeout(chimeTimer); chimeTimer = null }
+  const c = ctx, n = nodes
   ctx = null
   nodes = null
-  if (closingCtx && closingNodes) {
+  if (c && n) {
     try {
-      const g = closingNodes.gain.gain
-      g.cancelScheduledValues(closingCtx.currentTime)
-      g.setValueAtTime(g.value, closingCtx.currentTime)
-      g.linearRampToValueAtTime(0, closingCtx.currentTime + 0.5)
+      const g = n.master.gain
+      g.cancelScheduledValues(c.currentTime)
+      g.setValueAtTime(g.value, c.currentTime)
+      g.linearRampToValueAtTime(0, c.currentTime + 0.5)
     } catch { /* ignore */ }
-    setTimeout(() => { try { closingCtx.close() } catch { /* ignore */ } }, 700)
-  } else if (closingCtx) {
-    try { closingCtx.close() } catch { /* ignore */ }
+    setTimeout(() => { try { c.close() } catch { /* ignore */ } }, 700)
+  } else if (c) {
+    try { c.close() } catch { /* ignore */ }
   }
 }
