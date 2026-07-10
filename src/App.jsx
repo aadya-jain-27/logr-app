@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { SceneProvider, useScene } from './theme'
 import { FocusProvider } from './focus'
 import { SoundProvider, useSound } from './sound'
-import { startAmbient, stopAmbient } from './lib/ambient'
+import { startAmbient, stopAmbient, setVolume } from './lib/ambient'
 import Scene from './scenes/Scene'
 import TopBar from './components/TopBar'
 import FocusTimer from './components/FocusTimer'
@@ -37,12 +37,14 @@ function Shell() {
 // Plays the current scene's ambience while sound is on, and switches it with the world.
 function SceneAudio() {
   const { scene } = useScene()
-  const { soundOn } = useSound()
+  const { soundOn, volume } = useSound()
   useEffect(() => {
     if (!soundOn) { stopAmbient(); return }
-    startAmbient(scene)
+    startAmbient(scene, volume)
     return () => stopAmbient()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soundOn, scene])
+  useEffect(() => { if (soundOn) setVolume(volume) }, [volume, soundOn])
   return null
 }
 

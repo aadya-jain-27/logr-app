@@ -6,7 +6,7 @@ import { SCENES, getScene } from '../scenes/scenes'
 
 export default function TopBar() {
   const { scene, setScene } = useScene()
-  const { soundOn, toggleSound } = useSound()
+  const { soundOn, toggleSound, volume, setVolume } = useSound()
   const active = getScene(scene)
 
   return (
@@ -65,6 +65,14 @@ export default function TopBar() {
           >
             <Settings size={16} />
           </Link>
+          {soundOn && (
+            <div className="panel rounded-full px-3.5 h-10 flex items-center">
+              <input type="range" min="0" max="1" step="0.01" value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                aria-label="Ambient volume" title="Volume"
+                className="w-20 cursor-pointer" style={{ accentColor: 'var(--primary)' }} />
+            </div>
+          )}
           <button
             onClick={toggleSound}
             title={soundOn ? 'Mute ambient sound' : 'Play ambient sound'}
