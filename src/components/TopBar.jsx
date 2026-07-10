@@ -1,12 +1,12 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Sprout, Volume2, VolumeX, CalendarHeart, CalendarDays, Settings, Compass } from 'lucide-react'
 import { useScene } from '../theme'
+import { useSound } from '../sound'
 import { SCENES, getScene } from '../scenes/scenes'
 
 export default function TopBar() {
   const { scene, setScene } = useScene()
-  const [sound, setSound] = useState(false)
+  const { soundOn, toggleSound } = useSound()
   const active = getScene(scene)
 
   return (
@@ -66,12 +66,12 @@ export default function TopBar() {
             <Settings size={16} />
           </Link>
           <button
-            onClick={() => setSound((v) => !v)}
-            title="Ambient sound (coming soon, add audio files to enable)"
+            onClick={toggleSound}
+            title={soundOn ? 'Mute ambient sound' : 'Play ambient sound'}
             className="panel w-10 h-10 rounded-full flex items-center justify-center transition-transform hover:scale-105"
-            style={{ color: 'var(--text)' }}
+            style={{ color: soundOn ? 'var(--primary)' : 'var(--text)' }}
           >
-            {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
         </div>
       </div>

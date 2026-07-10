@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { useEffect } from 'react'
 import { SceneProvider, useScene } from './theme'
 import { FocusProvider } from './focus'
+import { SoundProvider, useSound } from './sound'
+import { startAmbient, stopAmbient } from './lib/ambient'
 import Scene from './scenes/Scene'
 import TopBar from './components/TopBar'
 import FocusTimer from './components/FocusTimer'
@@ -27,8 +29,21 @@ function Shell() {
         <Outlet />
       </main>
       <FocusTimer />
+      <SceneAudio />
     </div>
   )
+}
+
+// Plays the current scene's ambience while sound is on, and switches it with the world.
+function SceneAudio() {
+  const { scene } = useScene()
+  const { soundOn } = useSound()
+  useEffect(() => {
+    if (!soundOn) { stopAmbient(); return }
+    startAmbient(scene)
+    return () => stopAmbient()
+  }, [soundOn, scene])
+  return null
 }
 
 function NotificationScheduler() {
@@ -43,6 +58,7 @@ export default function App() {
   return (
     <SceneProvider>
       <FocusProvider>
+        <SoundProvider>
         <BrowserRouter>
           <NotificationScheduler />
           <Routes>
@@ -59,6 +75,7 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+        </SoundProvider>
       </FocusProvider>
     </SceneProvider>
   )
