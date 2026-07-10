@@ -55,7 +55,7 @@ export default function Onboarding() {
   const isYouTube = (url) => /youtu\.?be/.test(url)
   const addResource = () => {
     if (!nr.name.trim()) return
-    set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim(), notes: nr.notes.trim(), file: nr.file }] })
+    set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim() || nr.file?.url || '', notes: nr.notes.trim(), file: nr.file }] })
     setNr({ name: '', hours: '', url: '', notes: '', file: null })
   }
   const handleFileUpload = async (e) => {
@@ -95,6 +95,7 @@ export default function Onboarding() {
             ...prev,
             name: prev.name || data.title || '',
             hours: prev.hours || (data.hours ? String(data.hours) : ''),
+            url: '', // link is captured below; clear the bar so it reads fresh
             file: { name: data.title || 'YouTube video', url, topics: data.topics || [], summary: data.summary || '', kind: 'video' },
           }
         })

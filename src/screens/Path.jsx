@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Compass, GitBranch, Hammer, Check, Sparkles, CloudOff, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Compass, GitBranch, Hammer, Check, Sparkles, CloudOff, RefreshCw, CalendarDays } from 'lucide-react'
 import { getProfile, getValidRoadmap, saveRoadmap, clearRoadmap, pathDay } from '../data/store'
 import { requestRoadmap } from '../lib/plan'
 
@@ -100,8 +100,11 @@ export default function Path() {
         {status === 'ready' && roadmap && (
           <>
             {roadmap.summary && (
-              <p className="text-soft text-[15px] leading-relaxed mb-7">{roadmap.summary}</p>
+              <p className="text-soft text-[15px] leading-relaxed mb-3">{roadmap.summary}</p>
             )}
+            <Link to="/plan" className="inline-flex items-center gap-1.5 text-sm mb-7 hover:opacity-75 transition-opacity" style={{ color: 'var(--primary)' }}>
+              <CalendarDays size={14} /> See it on a calendar
+            </Link>
 
             {/* Phases as a calm vertical timeline. The current stretch is gently lit. */}
             <div className="relative">

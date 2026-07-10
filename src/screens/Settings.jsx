@@ -18,8 +18,8 @@ export default function Settings() {
     name: raw?.name || '',
     goal: raw?.goal || '',
     deadline: raw?.deadline || '',
-    wkday: raw?.wkday || '',
-    wkend: raw?.wkend || '',
+    wkday: raw?.weekday ?? raw?.wkday ?? '',
+    wkend: raw?.weekend ?? raw?.wkend ?? '',
     skipWeekend: raw?.skipWeekends ?? raw?.skipWeekend ?? false,
     scene: raw?.scene || 'sunset',
     notifyAt: raw?.notifyAt || '',
@@ -48,7 +48,7 @@ export default function Settings() {
   }
 
   const save = () => {
-    saveProfile({ ...raw, ...form, scene: form.scene, weekday: form.wkday, weekend: form.wkend, skipWeekends: form.skipWeekend })
+    saveProfile({ ...raw, ...form, scene: form.scene, weekday: Number(form.wkday) || 2, weekend: Number(form.wkend) || 3, skipWeekends: form.skipWeekend })
     setScene(form.scene)
     if (form.notifyAt && notifyPerm === 'granted') scheduleDaily(form.notifyAt)
     setSaved(true)

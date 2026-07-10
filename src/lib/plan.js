@@ -36,8 +36,8 @@ export function todayCapacity(profile) {
   const day = new Date().getDay() // 0 Sun ... 6 Sat
   const weekend = day === 0 || day === 6
   if (weekend && (profile?.skipWeekends || profile?.skipWeekend)) return { minutes: 0, dayType: 'a weekend', rest: true }
-  const hrs = weekend
-    ? Number(profile?.weekend ?? profile?.wkend ?? 2)
-    : Number(profile?.weekday ?? profile?.wkday ?? 2)
+  let hrs = Number(weekend ? (profile?.weekend ?? profile?.wkend) : (profile?.weekday ?? profile?.wkday))
+  // A blank or zero (e.g. saved as "" from settings) must never become a 0 hour, filler plan.
+  if (!Number.isFinite(hrs) || hrs <= 0) hrs = weekend ? 3 : 2
   return { minutes: Math.round(hrs * 60), dayType: weekend ? 'a weekend' : 'a weekday', rest: false }
 }

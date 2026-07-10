@@ -3,6 +3,7 @@ const KEY = 'logr-profile'
 const PLAN_KEY = 'logr-plan'
 const HISTORY_KEY = 'logr-history'
 const ROADMAP_KEY = 'logr-roadmap'
+const EXTRAS_KEY = 'logr-extras'
 
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
@@ -15,25 +16,53 @@ export function isOnboarded() {
   return localStorage.getItem('logr-onboarded') === '1'
 }
 
+// A plan is valid only for the day it was made AND the goal/resources/time it was made for.
+// Without the signature, changing your goal mid day would keep serving the old plan.
+function resourcesSig(resources) {
+  return (resources || []).map((r) => `${r.name}~${r.hours || ''}~${r.notes || ''}~${r.done ? 'd' : ''}`).join('|')
+}
+function planSignature(p) {
+  return `${p?.goal || ''}::${p?.deadline || ''}::${resourcesSig(p?.resources)}::${p?.weekday ?? p?.wkday ?? ''}::${p?.weekend ?? p?.wkend ?? ''}`
+}
 export function getRawPlan() {
   try { return JSON.parse(localStorage.getItem(PLAN_KEY)) } catch { return null }
 }
 export function getCachedPlan() {
   const raw = getRawPlan()
-  return raw && raw.date === new Date().toDateString() ? raw.plan : null
+  if (!raw || raw.date !== new Date().toDateString()) return null
+  if (raw.sig !== planSignature(getProfile())) return null // goal or resources changed, so replan
+  return raw.plan
 }
 export function savePlan(plan) {
-  localStorage.setItem(PLAN_KEY, JSON.stringify({ date: new Date().toDateString(), plan }))
+  localStorage.setItem(PLAN_KEY, JSON.stringify({ date: new Date().toDateString(), sig: planSignature(getProfile()), plan }))
   logProgress(plan) // keep history in sync on every save and check-off
 }
 export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)
 }
 
+// Personal one off tasks the student adds for a specific day, on top of the AI plan.
+// Kept separate from the plan so re-planning never wipes what you added yourself.
+function readExtras() {
+  try { return JSON.parse(localStorage.getItem(EXTRAS_KEY)) || {} } catch { return {} }
+}
+export function getExtras(dateStr = new Date().toDateString()) {
+  return readExtras()[dateStr] || []
+}
+export function saveExtras(list, dateStr = new Date().toDateString()) {
+  const all = readExtras()
+  all[dateStr] = list
+  localStorage.setItem(EXTRAS_KEY, JSON.stringify(all))
+}
+export function addExtra(title, minutes = 0, dateStr = new Date().toDateString()) {
+  const next = [...getExtras(dateStr), { id: `e${Date.now()}`, title: String(title || '').trim(), minutes: Number(minutes) || 0, done: false }]
+  saveExtras(next, dateStr)
+  return next
+}
+
 // The overall path (roadmap) behind the goal. Cached until the goal or resources change.
 function roadmapSignature(profile) {
-  const names = (profile?.resources || []).map((r) => r.name).join('|')
-  return `${profile?.goal || ''}::${profile?.deadline || ''}::${names}`
+  return `${profile?.goal || ''}::${profile?.deadline || ''}::${resourcesSig(profile?.resources)}`
 }
 export function getRoadmap() {
   try { return JSON.parse(localStorage.getItem(ROADMAP_KEY)) } catch { return null }
@@ -46,9 +75,11 @@ export function getValidRoadmap(profile) {
 export function saveRoadmap(profile, roadmap) {
   const sig = roadmapSignature(profile)
   const prev = getRoadmap()
-  // Keep the original start date when the same path is refreshed, so "day N" stays honest.
-  const startDate = prev && prev.sig === sig ? prev.startDate : new Date().toDateString()
-  const record = { sig, startDate, roadmap }
+  const goal = profile?.goal || ''
+  // Keep the original start date as long as the goal is unchanged, so adding or editing a
+  // resource mid journey does not reset you back to day 1.
+  const startDate = prev && prev.goal === goal ? prev.startDate : new Date().toDateString()
+  const record = { sig, goal, startDate, roadmap }
   localStorage.setItem(ROADMAP_KEY, JSON.stringify(record))
   return record
 }

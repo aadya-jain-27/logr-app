@@ -9,6 +9,7 @@ import Today from './screens/Today'
 import Onboarding from './screens/Onboarding'
 import Journey from './screens/Journey'
 import Path from './screens/Path'
+import Calendar from './screens/Calendar'
 import Settings from './screens/Settings'
 import ShareCard from './screens/ShareCard'
 import { isOnboarded, getProfile } from './data/store'
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/today" element={<Today />} />
               <Route path="/journey" element={<Journey />} />
               <Route path="/path" element={<Path />} />
+              <Route path="/plan" element={<Calendar />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/share" element={<ShareCard />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -14,9 +14,9 @@ Today is ${date}, which is ${dayType}.
 Their goal: ${g || 'general study progress'}
 Target timeframe: ${dl || 'no fixed deadline'}
 Time they can give today: about ${minutesToday} minutes total.
-${resources && resources.length ? `They are learning from these specific resources only. Do not invent or suggest other materials. Plan the NEXT chunk of the relevant one(s) for today, progressing from what they have already done. Respect any constraints written in the notes for each resource — they are hard requirements (e.g. "finish today" means plan all of it today, "divide across 3 days" means spread it). For "source", use a short human-readable name like the resource name or platform. Never put a URL in "source". If a link is provided, reference that specific resource by name in the task title:\n${resources.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ' (length unknown, estimate it)'}${r.url ? ` [${r.url}]` : ''}${r.file ? ` | ${r.file.pageCount ? `${r.file.pageCount} pages, ` : ''}${(r.file.topics || []).length ? `covers: ${(r.file.topics || []).slice(0, 8).join(', ')}` : ''}` : ''}${r.notes ? ` | constraints: ${sanitize(r.notes, 300)}` : ''}`).join('\n')}\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.map(s => sanitize(s, 100)).join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}
+${resources && resources.length ? `They are learning from these specific resources only. Do not invent or suggest other materials. Plan the NEXT chunk of the relevant one(s) for today, progressing from what they have already done. Respect the timing notes on each resource, but never plan more than the available minutes today. If a note says "finish today" and it fits in today's time, plan all of it. If it is longer than today's time, plan as much as fits and note honestly in acknowledgements that it runs longer than today allows. "Divide across N days" means today gets one fair chunk, not the whole thing. For "source", use a short human-readable name like the resource name or platform. Never put a URL in "source". If a link is provided, reference that specific resource by name in the task title:\n${resources.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ' (length unknown, estimate it)'}${r.url ? ` [${r.url}]` : ''}${r.file ? ` | ${r.file.pageCount ? `${r.file.pageCount} pages, ` : ''}${(r.file.topics || []).length ? `covers: ${(r.file.topics || []).slice(0, 8).join(', ')}` : ''}` : ''}${r.notes ? ` | constraints: ${sanitize(r.notes, 300)}` : ''}`).join('\n')}\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.map(s => sanitize(s, 100)).join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}
 Rules:
-- Plan ONLY today. Usually 2 to 4 small, specific, doable tasks that together fit within ${minutesToday} minutes.
+- Plan ONLY today. Usually 2 to 4 small, specific, doable tasks. The tasks together must fit within ${minutesToday} minutes and must never exceed it.
 - Each task is a concrete action (not vague). For "source", use a short human-readable name like the resource name or platform (e.g. "Pandas tutorial", "Coursera", "Chapter 3"). Never put a URL in "source".
 - Every task must be distinct. Never repeat a task or list the same thing twice.
 - Keep it gentle and achievable. Never overload an overwhelmed student.
@@ -41,31 +41,39 @@ export function buildRoadmapPrompt({ goal, deadline, weekdayHours, weekendHours,
   const g = sanitize(goal, 200)
   const dl = sanitize(deadline, 100)
   const res = (resources || []).filter((r) => !r.done)
-  return `You are Logr, a calm, encouraging study coach. Design the overall PATH for this student's goal. This is the map you quietly hold for them, so day to day they only ever have to look at today.
+  return `You are Logr, a calm study coach. Design an accurate, personalized PATH that actually achieves THIS student's goal within their timeframe. This is the real plan you hold for them, so day to day they only look at today.
 
 Their goal: ${g || 'general study progress'}
-Target timeframe: ${dl || 'no fixed deadline, so propose a sensible one'}
+Target timeframe: ${dl || 'no fixed deadline, so choose a sensible one and say so'}
 Time they can usually give: about ${weekdayHours ?? 2} hours on weekdays and ${weekendHours ?? 3} hours on weekends.
-${res.length ? `They are learning from these specific resources only. Build the path around them, in a sensible order. Do not invent other materials:\n${res.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ''}${r.file?.pageCount ? ` (${r.file.pageCount} pages)` : ''}${r.file?.topics?.length ? `, topics: ${r.file.topics.slice(0, 8).join(', ')}` : ''}`).join('\n')}\n` : 'They did not list resources. Suggest a realistic path using well known, mostly free materials for this goal, named specifically.\n'}
-Design a phased path that fits their real available time and timeframe. Break it into a few clear phases, each spanning a stretch of days. When the goal is skill or portfolio building, also propose two or three small projects they can build to prove the skill, and encourage them to push each one to GitHub as visible evidence of their work.
+${res.length ? `The student is currently working from these resources. Anchor the path in them and place each where it truly belongs. Honor any timing note exactly: if a note says finish today, this week, or by a date, schedule that resource at the very start, never late:\n${res.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ''}${r.file?.pageCount ? ` (${r.file.pageCount} pages)` : ''}${r.file?.topics?.length ? `, topics: ${r.file.topics.slice(0, 8).join(', ')}` : ''}${r.notes ? ` | the student said: ${sanitize(r.notes, 200)}` : ''}`).join('\n')}\n` : 'The student has not listed resources yet.\n'}
+Work out what this specific goal genuinely requires from start to finish, then lay it across the timeframe. Where the student's own resources cover a part, use them there. Where the goal needs more than they listed, add specific, mostly free, well known materials BY NAME (real courses, books, sites), never vague advice. Front load what the student is doing right now and anything they marked urgent.
+
+Make it feel handmade for THIS goal:
+- Phase titles must be specific to the goal, not generic. Good: "Python and data handling", "Supervised learning and a first model", "DSA and interview prep". Bad: "Building foundations", "Applying knowledge".
+- Each phase names the concrete skills or topics it covers and the resources it draws on.
+- Include two or three portfolio projects to build that prove the skill, and encourage pushing each to GitHub.
+- Fill "schedule": give each resource the STUDENT actually listed a day range that honors its note exactly. "divide across 2 weeks" is a span of about 14 days, "divide across 5 days" about 5 days, "finish today" means dayStart and dayEnd are both 1, "finish this week" about 7 days. With no note, give a sensible span from its length. Only the student's own listed resources go here, never the extra materials you added.
 
 Rules:
-- Be realistic about pace given their hours. Do not cram. It is better to finish calmly than to overload.
-- Keep the tone warm and reassuring. This is a map they can glance at for comfort, never a burden.
-- Ground phases in their actual resources and known lengths where given.
-- Do NOT use em dashes, en dashes, or hyphens between words or numbers. Use commas or periods, and write number ranges with the word "to".
+- Be realistic about pace for their hours. It is fine to finish a little before the deadline. Never cram, and never pad with filler just to fill time.
+- Keep the tone warm and reassuring. This is a map for comfort, not a burden.
+- Do NOT use em dashes, en dashes, or hyphens between words or numbers. Use commas or periods, and write ranges with the word "to".
 
 Return STRICT JSON in exactly this shape, nothing else:
 {
-  "summary": "one or two calm sentences describing the shape of the journey",
-  "totalDays": number (whole number of days the whole path spans),
+  "summary": "one or two calm sentences on the shape of the journey, specific to this goal",
+  "totalDays": number (whole number of days the path spans, within the timeframe),
   "phases": [
-    { "title": "string", "dayStart": number, "dayEnd": number, "focus": "one short line on what this phase builds", "resources": ["short resource or topic names this phase draws on"] }
+    { "title": "specific phase title", "dayStart": number, "dayEnd": number, "focus": "one line on the concrete skills this phase builds", "resources": ["specific resource or topic names this phase uses"] }
+  ],
+  "schedule": [
+    { "resource": "the student's own resource name, exactly as they wrote it", "dayStart": number, "dayEnd": number }
   ],
   "projects": [
-    { "title": "string", "what": "one or two sentences on what to build", "proves": "the skill it demonstrates to someone reviewing it" }
+    { "title": "string", "what": "one or two sentences on what to build", "proves": "the skill it demonstrates to a reviewer" }
   ],
-  "githubNote": "one short encouraging sentence about pushing this work to GitHub as proof of progress"
+  "githubNote": "one short encouraging sentence about pushing this work to GitHub as proof"
 }`
 }
 

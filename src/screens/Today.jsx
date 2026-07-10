@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass } from 'lucide-react'
-import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay } from '../data/store'
+import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
+import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras } from '../data/store'
 import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
 import { useFocus } from '../focus'
 
@@ -54,6 +54,8 @@ export default function Today() {
   const [expandedTips, setExpandedTips] = useState(new Set())
   const [carriedTasks, setCarriedTasks] = useState([])
   const [path, setPath] = useState(() => pathDay(profile))
+  const [extras, setExtras] = useState(() => getExtras())
+  const [newExtra, setNewExtra] = useState('')
 
   const generate = useCallback(async () => {
     if (!profile) return
@@ -85,11 +87,12 @@ export default function Today() {
     if (!profile) return
     if (cap.rest) { setStatus('rest'); return }
     const cached = getCachedPlan()
-    if (cached?.tasks?.length) {
+    const cachedMinutes = (cached?.tasks || []).reduce((s, t) => s + (t.minutes || 0), 0)
+    if (cached?.tasks?.length && cachedMinutes > 0) {
       setTasks(withIds(cached.tasks))
       setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null, acknowledgements: Array.isArray(cached.acknowledgements) ? cached.acknowledgements : [] })
       setStatus('ready')
-    } else { generate() }
+    } else { generate() } // no cache, or a broken zero minute plan, so replan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -127,8 +130,18 @@ export default function Today() {
     return next
   })
 
-  const remaining = tasks.filter((t) => !t.done).length
-  const totalMin = tasks.reduce((s, t) => s + (t.minutes || 0), 0)
+  // Your own additions for today, stored separately so re-planning never wipes them.
+  const addExtraTask = () => {
+    const title = newExtra.trim()
+    if (!title) return
+    setExtras(addExtra(title))
+    setNewExtra('')
+  }
+  const toggleExtra = (id) => setExtras((xs) => { const next = xs.map((x) => (x.id === id ? { ...x, done: !x.done } : x)); saveExtras(next); return next })
+  const removeExtra = (id) => setExtras((xs) => { const next = xs.filter((x) => x.id !== id); saveExtras(next); return next })
+
+  const remaining = tasks.filter((t) => !t.done).length + extras.filter((x) => !x.done).length
+  const totalMin = tasks.reduce((s, t) => s + (t.minutes || 0), 0) + extras.reduce((s, x) => s + (x.minutes || 0), 0)
 
   return (
     <div className="min-h-screen flex items-center justify-center lg:justify-end px-5 md:px-10 lg:px-20 pt-28 pb-12">
@@ -313,6 +326,40 @@ export default function Today() {
                   <span className="shrink-0 text-xs self-center" style={{ color: 'var(--text-soft)' }}>{t.minutes}m</span>
                 </motion.div>
               ))}
+            </div>
+
+            {/* Your own additions for today, kept even when the AI plan re-plans */}
+            {extras.length > 0 && (
+              <div className="space-y-2.5 mt-2.5">
+                {extras.map((x) => (
+                  <div key={x.id} role="button" tabIndex={0}
+                    onClick={() => toggleExtra(x.id)}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleExtra(x.id)}
+                    className="chip w-full text-left rounded-2xl p-4 flex items-start gap-3.5 cursor-pointer"
+                    style={{ userSelect: 'none', opacity: x.done ? 0.55 : 1 }}>
+                    <span className="shrink-0 mt-0.5 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                      style={{ background: x.done ? 'var(--primary)' : 'transparent', border: x.done ? 'none' : '2px solid var(--text-soft)', color: 'var(--on-primary)' }}>
+                      {x.done && <Check size={14} strokeWidth={3} />}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] font-semibold leading-snug" style={{ color: 'var(--text)', textDecoration: x.done ? 'line-through' : 'none' }}>{x.title}</div>
+                      <div className="text-soft text-xs mt-0.5">Added by you</div>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); removeExtra(x.id) }} className="shrink-0 self-center hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={newExtra} onChange={(e) => setNewExtra(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addExtraTask()}
+                placeholder="Add something of your own for today"
+                className="flex-1 px-3.5 py-2.5 rounded-2xl text-sm outline-none"
+                style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)', color: 'var(--text)' }}
+              />
+              <button onClick={addExtraTask} className="btn-primary w-10 h-10 rounded-full flex items-center justify-center shrink-0" title="Add to today"><Plus size={16} /></button>
             </div>
 
             <div className="mt-6 flex items-center justify-center gap-4 text-sm text-soft flex-wrap">
