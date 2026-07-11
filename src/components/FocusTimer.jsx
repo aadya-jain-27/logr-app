@@ -33,6 +33,7 @@ export default function FocusTimer() {
   const [running, setRunning] = useState(false)
   const [cycles, setCycles] = useState(0)
   const tick = useRef()
+  const endRef = useRef(0) // timestamp when the current phase ends
 
   const activeDurations = preset === -1
     ? { f: Math.max(1, parseInt(custom.f) || 25), b: Math.max(1, parseInt(custom.b) || 5) }
@@ -44,19 +45,23 @@ export default function FocusTimer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
+  // Timestamp based so it stays accurate when the tab is in the background, where setInterval is throttled.
   useEffect(() => {
     if (!running) return
-    tick.current = setInterval(() => {
-      setSecs((s) => {
-        if (s <= 1) {
-          playChime()
-          if (mode === 'focus') { setMode('break'); setCycles((c) => c + 1); return activeDurations.b * 60 }
-          setMode('focus'); return activeDurations.f * 60
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(tick.current)
+    const step = () => {
+      const remaining = Math.max(0, Math.round((endRef.current - Date.now()) / 1000))
+      if (remaining <= 0) {
+        playChime()
+        if (mode === 'focus') { setCycles((c) => c + 1); endRef.current = Date.now() + activeDurations.b * 60 * 1000; setMode('break'); setSecs(activeDurations.b * 60) }
+        else { endRef.current = Date.now() + activeDurations.f * 60 * 1000; setMode('focus'); setSecs(activeDurations.f * 60) }
+      } else {
+        setSecs(remaining)
+      }
+    }
+    tick.current = setInterval(step, 500)
+    const onVisible = () => { if (document.visibilityState === 'visible') step() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(tick.current); document.removeEventListener('visibilitychange', onVisible) }
     // activeDurations is derived from preset and custom, which are already dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, mode, preset, custom])
@@ -77,6 +82,7 @@ export default function FocusTimer() {
     setPreset(-1); setEditingCustom(false); setMode('focus'); setSecs(f * 60); setRunning(false)
   }
   const reset = () => { setMode('focus'); setSecs(activeDurations.f * 60); setRunning(false) }
+  const togglePlay = () => setRunning((r) => { if (!r) endRef.current = Date.now() + secs * 1000; return !r })
 
   return (
     <AnimatePresence>
@@ -105,7 +111,7 @@ export default function FocusTimer() {
         </div>
 
         <div className="flex items-center justify-center gap-2.5 mb-4">
-          <button onClick={() => setRunning((r) => !r)} className="btn-primary w-11 h-11 rounded-full flex items-center justify-center">
+          <button onClick={togglePlay} className="btn-primary w-11 h-11 rounded-full flex items-center justify-center">
             {running ? <Pause size={17} /> : <Play size={17} style={{ marginLeft: 1 }} />}
           </button>
           <button onClick={reset} className="w-11 h-11 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity" style={{ border: '1px solid var(--panel-border)', color: 'var(--text)' }}>
