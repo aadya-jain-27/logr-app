@@ -314,6 +314,9 @@ export default function Onboarding() {
                   <div style={{ color: 'var(--text)' }} className="font-medium mb-1">{p.goal || 'Your goal'}</div>
                   <div className="text-soft text-xs">{p.weekday}h weekdays, {p.weekend}h weekends{p.deadline ? `, ${p.deadline}` : ''}{p.resources.length ? `, ${p.resources.length} resource${p.resources.length > 1 ? 's' : ''}` : ''}</div>
                 </div>
+                <p className="text-soft text-xs mt-5 max-w-sm mx-auto" style={{ opacity: 0.8 }}>
+                  Everything is saved privately on this device. No account needed.
+                </p>
               </div>
             )}
           </motion.div>

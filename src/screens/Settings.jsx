@@ -291,6 +291,7 @@ export default function Settings() {
           ) : (
             <button onClick={() => setConfirmReset(true)} className="text-sm hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}>Start over</button>
           )}
+          <p className="text-xs mt-3" style={{ color: 'var(--text-soft)', opacity: 0.8 }}>Your plan is saved privately on this device.</p>
         </div>
       </motion.div>
     </div>
