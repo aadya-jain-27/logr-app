@@ -127,38 +127,12 @@ export async function generateRoadmap(key, input) {
   return runWithFallback(key, buildRoadmapPrompt(input), 0.6)
 }
 
-export async function parseFile(key, buffer, mimeType) {
-  const uploadRes = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=media&key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': mimeType, 'X-Goog-Upload-Protocol': 'raw' },
-    body: buffer,
-  })
-  if (!uploadRes.ok) throw new Error(`upload failed: ${uploadRes.status}`)
-  const { file } = await uploadRes.json()
-  const prompt = 'Analyse this document. Return JSON: { "title": string, "pageCount": number, "topics": string[], "summary": string (2 to 3 sentences) }. Nothing else.'
-  // Documents need a capable model, so try those first, then fall back to whatever the key can use.
-  const candidates = [...new Set(['gemini-2.5-flash', 'gemini-2.0-flash', ...(cachedModel ? [cachedModel] : []), ...(await discoverModels(key))])]
-  let lastErr = 'no models available'
-  for (const model of candidates) {
-    let r
-    try {
-      r = await fetch(`${API}/models/${model}:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ file_data: { mime_type: mimeType, file_uri: file.uri } }, { text: prompt }] }],
-          // No thinking budget: this is metadata extraction, so keep it fast.
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      })
-    } catch (e) { lastErr = String(e); continue }
-    if (!r.ok) { lastErr = `${model}: ${r.status}`; continue }
-    const data = await r.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (text) { setCachedModel(model); return JSON.parse(text) }
-    lastErr = `${model}: empty response`
-  }
-  throw new Error(lastErr)
+// Analyses text already extracted from the file in the browser, so there is no upload size limit.
+export async function parseFile(key, { text, pageCount, name } = {}) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 14000)
+  const prompt = `A student uploaded a study document named "${sanitize(name || 'document', 120)}"${pageCount ? ` with about ${pageCount} pages or slides` : ''}. Using the extracted text below, return STRICT JSON: { "title": string, "pageCount": number, "topics": string[] (up to 8 key study topics it covers), "summary": string (2 to 3 sentences) }. Do not use dashes or hyphens. Nothing else.\n\nTEXT:\n${clean}`
+  const out = await runWithFallback(key, prompt, 0.3)
+  return { title: out.title || name || 'Document', pageCount: Number(out.pageCount) || pageCount || null, topics: Array.isArray(out.topics) ? out.topics.slice(0, 8) : [], summary: out.summary || '' }
 }
 
 function formatLength(totalSeconds) {

@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Plus, Check, Minus, X, Sparkles, BookOpen, Clock
 import { SCENES } from '../scenes/scenes'
 import { useScene } from '../theme'
 import { saveProfile, isOnboarded } from '../data/store'
+import { extractFileText } from '../lib/filetext'
 import { isYouTube } from '../lib/util'
 
 const GOAL_SUGGESTIONS = ['Land an ML internship', 'Crack campus placements', 'Learn full-stack web dev', 'Ace this semester', 'Crack GATE', 'Ship a startup project']
@@ -63,21 +64,16 @@ export default function Onboarding() {
     const f = e.target.files?.[0]
     if (!f) return
     setFileErr('')
-    // Serverless request bodies are capped near 4.5 MB, and base64 adds a third, so guard well under.
-    if (f.size > 3.3 * 1024 * 1024) { setFileErr('That file is over 3 MB. Try a smaller one, or paste a link instead.'); e.target.value = ''; return }
+    if (f.size > 40 * 1024 * 1024) { setFileErr('That file is very large. Try one under 40 MB, or paste a link instead.'); e.target.value = ''; return }
     setFileLoading(true)
     try {
-      // Send as base64 JSON so it works the same in dev and on serverless (no raw body parsing).
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(f)
-      })
+      // Read the text in the browser and send only that, so there is no upload size limit.
+      const extracted = await extractFileText(f)
+      if (!extracted || !extracted.text.trim()) { setFileErr('Could not read text from that file. Try a PDF or PPTX, or paste a link.'); e.target.value = ''; return }
       const res = await fetch('/api/parse-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: base64, mimeType: f.type || 'application/pdf' }),
+        body: JSON.stringify(extracted),
       })
       const data = await res.json()
       if (!data.error) {

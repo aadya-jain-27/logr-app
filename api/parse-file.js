@@ -8,9 +8,7 @@ export default async function handler(req, res) {
     res.status(200).json({ error: 'no_key' }); return
   }
   try {
-    const { data, mimeType } = req.body || {}
-    const buffer = Buffer.from(data || '', 'base64')
-    const result = await parseFile(key, buffer, mimeType || 'application/pdf')
+    const result = await parseFile(key, req.body || {})
     res.status(200).json(result)
   } catch (e) {
     res.status(200).json({ error: 'parse_failed', detail: String(e) })

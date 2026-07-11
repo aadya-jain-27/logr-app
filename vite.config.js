@@ -17,9 +17,7 @@ function logrApi(env) {
           const key = env.GEMINI_API_KEY
           if (!key || key.includes('your_free_gemini')) { res.end(JSON.stringify({ error: 'no_key' })); return }
           try {
-            const { data, mimeType } = JSON.parse(body || '{}')
-            const buffer = Buffer.from(data || '', 'base64')
-            const result = await parseFile(key, buffer, mimeType || 'application/pdf')
+            const result = await parseFile(key, JSON.parse(body || '{}'))
             res.end(JSON.stringify(result))
           } catch (e) {
             res.end(JSON.stringify({ error: 'parse_failed', detail: String(e) }))
