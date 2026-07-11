@@ -370,7 +370,7 @@ export default function Today() {
 
             <div className="mt-6 flex items-center justify-center gap-4 text-sm text-soft flex-wrap">
               <button
-                onClick={() => openFocus(tasks.find((t) => !t.done)?.title ?? null)}
+                onClick={() => openFocus()}
                 className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"
               >
                 <Timer size={14} /> Focus

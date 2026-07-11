@@ -24,7 +24,7 @@ function playChime() {
 }
 
 export default function FocusTimer() {
-  const { isOpen, taskLabel, close } = useFocus()
+  const { isOpen, close } = useFocus()
   const [preset, setPreset] = useState(0) // -1 = custom
   const [custom, setCustom] = useState({ f: '', b: '' })
   const [editingCustom, setEditingCustom] = useState(false)
@@ -92,10 +92,6 @@ export default function FocusTimer() {
           </span>
           <button onClick={close} className="hover:opacity-70 transition-opacity" style={{ color: 'var(--text-soft)' }}><X size={15} /></button>
         </div>
-
-        {taskLabel && mode === 'focus' && (
-          <div className="text-xs text-soft mb-3 truncate" title={taskLabel}>{taskLabel}</div>
-        )}
 
         <div className="relative w-[120px] h-[120px] mx-auto mb-3">
           <svg className="w-full h-full -rotate-90" viewBox="0 0 110 110">

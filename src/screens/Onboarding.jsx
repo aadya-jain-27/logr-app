@@ -41,6 +41,7 @@ export default function Onboarding() {
   const [fileLoading, setFileLoading] = useState(false)
   const [urlLoading, setUrlLoading] = useState(false)
   const [urlErr, setUrlErr] = useState(false)
+  const [fileErr, setFileErr] = useState('')
   const set = (patch) => setP((prev) => ({ ...prev, ...patch }))
 
   const canNext = step === 1 ? p.goal.trim().length > 0 : true
@@ -61,6 +62,9 @@ export default function Onboarding() {
   const handleFileUpload = async (e) => {
     const f = e.target.files?.[0]
     if (!f) return
+    setFileErr('')
+    // Serverless request bodies are capped near 4.5 MB, and base64 adds a third, so guard well under.
+    if (f.size > 3.3 * 1024 * 1024) { setFileErr('That file is over 3 MB. Try a smaller one, or paste a link instead.'); e.target.value = ''; return }
     setFileLoading(true)
     try {
       // Send as base64 JSON so it works the same in dev and on serverless (no raw body parsing).
@@ -84,8 +88,10 @@ export default function Onboarding() {
           notes: prev.notes || (data.summary ? data.summary : ''),
           file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary },
         }))
+      } else {
+        setFileErr('Could not read that file. You can type the details instead.')
       }
-    } catch { /* upload is best effort; the student can still type the details */ } finally { setFileLoading(false) }
+    } catch { setFileErr('Could not read that file. You can type the details instead.') } finally { setFileLoading(false) }
     e.target.value = ''
   }
   // Read a YouTube link to fill in its real length and topics.
@@ -275,6 +281,9 @@ export default function Onboarding() {
                     <div className="px-3 py-1.5 text-xs flex items-center gap-1.5" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--primary)' }}>
                       <Paperclip size={11} /> {nr.file.name}{nr.file.pageCount ? ` (${nr.file.pageCount} pages)` : nr.file.topics?.length ? ` (${nr.file.topics.length} topics)` : ''}
                     </div>
+                  )}
+                  {fileErr && (
+                    <div className="px-3 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>{fileErr}</div>
                   )}
                   <div className="flex items-center" style={{ borderTop: '1px solid var(--panel-border)' }}>
                     <input className="flex-1 px-3 py-2 text-sm outline-none bg-transparent" style={{ color: 'var(--text)', opacity: 0.8 }} placeholder="YouTube or course link (optional)" value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setUrlErr(false) }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
