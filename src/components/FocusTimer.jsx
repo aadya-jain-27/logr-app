@@ -57,6 +57,8 @@ export default function FocusTimer() {
       })
     }, 1000)
     return () => clearInterval(tick.current)
+    // activeDurations is derived from preset and custom, which are already dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, mode, preset, custom])
 
   if (!isOpen) return null

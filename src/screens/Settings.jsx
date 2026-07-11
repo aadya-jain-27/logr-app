@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, BellOff } from 'lucide-react'
+import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell } from 'lucide-react'
 import { getProfile, saveProfile } from '../data/store'
 import { useScene } from '../theme'
 import { SCENES } from '../scenes/scenes'
 import { requestPermission, scheduleDaily } from '../lib/notify'
-
-const isYouTube = (u) => /youtu\.?be/.test(u || '')
+import { isYouTube } from '../lib/util'
 
 export default function Settings() {
   const navigate = useNavigate()

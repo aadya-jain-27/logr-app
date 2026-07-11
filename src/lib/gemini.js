@@ -136,22 +136,30 @@ export async function parseFile(key, buffer, mimeType) {
   })
   if (!uploadRes.ok) throw new Error(`upload failed: ${uploadRes.status}`)
   const { file } = await uploadRes.json()
-  const model = cachedModel || PREFERRED[0]
-  const genRes = await fetch(`${API}/models/${model}:generateContent?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { file_data: { mime_type: mimeType, file_uri: file.uri } },
-        { text: 'Analyse this document. Return JSON: { "title": string, "pageCount": number, "topics": string[], "summary": string (2 to 3 sentences) }. Nothing else.' }
-      ]}],
-      // No thinking budget: this is metadata extraction, so keep it fast.
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
-    }),
-  })
-  const data = await genRes.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-  return JSON.parse(text)
+  const prompt = 'Analyse this document. Return JSON: { "title": string, "pageCount": number, "topics": string[], "summary": string (2 to 3 sentences) }. Nothing else.'
+  // Documents need a capable model, so try those first, then fall back to whatever the key can use.
+  const candidates = [...new Set(['gemini-2.5-flash', 'gemini-2.0-flash', ...(cachedModel ? [cachedModel] : []), ...(await discoverModels(key))])]
+  let lastErr = 'no models available'
+  for (const model of candidates) {
+    let r
+    try {
+      r = await fetch(`${API}/models/${model}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ file_data: { mime_type: mimeType, file_uri: file.uri } }, { text: prompt }] }],
+          // No thinking budget: this is metadata extraction, so keep it fast.
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
+        }),
+      })
+    } catch (e) { lastErr = String(e); continue }
+    if (!r.ok) { lastErr = `${model}: ${r.status}`; continue }
+    const data = await r.json()
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (text) { setCachedModel(model); return JSON.parse(text) }
+    lastErr = `${model}: empty response`
+  }
+  throw new Error(lastErr)
 }
 
 function formatLength(totalSeconds) {

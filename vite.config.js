@@ -10,16 +10,16 @@ function logrApi(env) {
     configureServer(server) {
       server.middlewares.use('/api/parse-file', (req, res) => {
         if (req.method !== 'POST') { res.statusCode = 405; res.end('Method not allowed'); return }
-        const chunks = []
-        req.on('data', (c) => chunks.push(c))
+        let body = ''
+        req.on('data', (c) => (body += c))
         req.on('end', async () => {
           res.setHeader('Content-Type', 'application/json')
           const key = env.GEMINI_API_KEY
           if (!key || key.includes('your_free_gemini')) { res.end(JSON.stringify({ error: 'no_key' })); return }
           try {
-            const buffer = Buffer.concat(chunks)
-            const mimeType = req.headers['content-type'] || 'application/pdf'
-            const result = await parseFile(key, buffer, mimeType)
+            const { data, mimeType } = JSON.parse(body || '{}')
+            const buffer = Buffer.from(data || '', 'base64')
+            const result = await parseFile(key, buffer, mimeType || 'application/pdf')
             res.end(JSON.stringify(result))
           } catch (e) {
             res.end(JSON.stringify({ error: 'parse_failed', detail: String(e) }))

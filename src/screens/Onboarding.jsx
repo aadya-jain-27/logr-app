@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Plus, Check, Minus, X, Sparkles, BookOpen, Clock
 import { SCENES } from '../scenes/scenes'
 import { useScene } from '../theme'
 import { saveProfile, isOnboarded } from '../data/store'
+import { isYouTube } from '../lib/util'
 
 const GOAL_SUGGESTIONS = ['Land an ML internship', 'Crack campus placements', 'Learn full-stack web dev', 'Ace this semester', 'Crack GATE', 'Ship a startup project']
 const DEADLINES = ['In 1 month', 'In 3 months', 'In 6 months', 'By end of semester']
@@ -33,7 +34,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [p, setP] = useState({
     name: '', goal: '', deadline: '', weekday: 2, weekend: 4,
-    commitments: [], skipWeekends: false, vacation: { from: '', to: '' }, resources: [], material: '',
+    commitments: [], skipWeekends: false, resources: [],
   })
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
   const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', file: null })
@@ -52,7 +53,6 @@ export default function Onboarding() {
     set({ commitments: [...p.commitments, nc] })
     setNc({ name: '', date: '', type: 'Exam' })
   }
-  const isYouTube = (url) => /youtu\.?be/.test(url)
   const addResource = () => {
     if (!nr.name.trim()) return
     set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim() || nr.file?.url || '', notes: nr.notes.trim(), file: nr.file }] })
@@ -63,7 +63,18 @@ export default function Onboarding() {
     if (!f) return
     setFileLoading(true)
     try {
-      const res = await fetch('/api/parse-file', { method: 'POST', headers: { 'Content-Type': f.type }, body: f })
+      // Send as base64 JSON so it works the same in dev and on serverless (no raw body parsing).
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(f)
+      })
+      const res = await fetch('/api/parse-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: base64, mimeType: f.type || 'application/pdf' }),
+      })
       const data = await res.json()
       if (!data.error) {
         setNr((prev) => ({
@@ -74,7 +85,7 @@ export default function Onboarding() {
           file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary },
         }))
       }
-    } catch { } finally { setFileLoading(false) }
+    } catch { /* upload is best effort; the student can still type the details */ } finally { setFileLoading(false) }
     e.target.value = ''
   }
   // Read a YouTube link to fill in its real length and topics.

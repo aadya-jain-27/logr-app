@@ -15,7 +15,7 @@ function Duck({ delay, top, dur }) {
 
 export default function LakesideMorning() {
   const reduced = useReducedMotion()
-  const { sx, sy } = usePointerParallax(reduced)
+  const { sx } = usePointerParallax(reduced)
   const cl = useTransform(sx, (v) => v * -7)
   const hillX = useTransform(sx, (v) => v * 10)
   const reedX = useTransform(sx, (v) => v * 22)

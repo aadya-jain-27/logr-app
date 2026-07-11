@@ -150,11 +150,11 @@ export default function Calendar() {
               {view === 'month' ? (
                 <MonthView key={'m' + monthOffset}
                   base={new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)}
-                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected, shortName }} />
+                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected }} />
               ) : (
                 <WeekView key={'w' + weekOffset}
                   weekStart={addDays(addDays(today, -today.getDay()), weekOffset * 7)}
-                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, shortName }} />
+                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays }} />
               )}
             </AnimatePresence>
 
@@ -180,7 +180,7 @@ export default function Calendar() {
   )
 }
 
-function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected, shortName }) {
+function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected }) {
   const year = base.getFullYear(), month = base.getMonth()
   const firstWeekday = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -265,7 +265,7 @@ function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, e
   )
 }
 
-function WeekView({ weekStart, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, shortName }) {
+function WeekView({ weekStart, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }} className="space-y-2">
