@@ -110,8 +110,7 @@ async function runWithFallback(key, promptText, temperature = 0.7) {
   for (const model of candidates) {
     let r
     try { r = await callGenerate(key, model, promptText, temperature) } catch (e) { lastErr = String(e); continue }
-    if (r.status === 429 || r.status === 404 || r.status === 400) { lastErr = `${model}: ${r.status}`; continue }
-    if (!r.ok) { lastErr = `${model}: ${r.status} ${await r.text()}`; continue }
+    if (!r.ok) { lastErr = `${model}: ${r.status} ${(await r.text()).slice(0, 160)}`; continue }
     const data = await r.json()
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
     setCachedModel(model)
