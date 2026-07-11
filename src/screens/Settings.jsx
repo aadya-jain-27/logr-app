@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell } from 'lucide-react'
+import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, Paperclip, Loader } from 'lucide-react'
 import { getProfile, saveProfile } from '../data/store'
 import { useScene } from '../theme'
 import { SCENES } from '../scenes/scenes'
 import { requestPermission, scheduleDaily } from '../lib/notify'
 import { isYouTube } from '../lib/util'
+import { extractFileText } from '../lib/filetext'
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -26,7 +27,9 @@ export default function Settings() {
     commitments: raw?.commitments || [],
   })
 
-  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '' })
+  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', file: null })
+  const [fileLoading, setFileLoading] = useState(false)
+  const [fileErr, setFileErr] = useState('')
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
   const [saved, setSaved] = useState(false)
   const [notifyPerm, setNotifyPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
@@ -37,7 +40,25 @@ export default function Settings() {
   const addResource = () => {
     if (!nr.name.trim()) return
     set('resources', [...form.resources, { ...nr, done: false }])
-    setNr({ name: '', hours: '', url: '', notes: '' })
+    setNr({ name: '', hours: '', url: '', notes: '', file: null })
+    setFileErr('')
+  }
+  const handleFileUpload = async (e) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFileErr('')
+    if (f.size > 40 * 1024 * 1024) { setFileErr('That file is very large. Try one under 40 MB, or paste a link instead.'); e.target.value = ''; return }
+    setFileLoading(true)
+    try {
+      const extracted = await extractFileText(f)
+      if (!extracted || !extracted.text.trim()) { setFileErr('Could not read text from that file. Try a PDF or PPTX, or paste a link.'); e.target.value = ''; return }
+      const res = await fetch('/api/parse-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extracted) })
+      const data = await res.json()
+      if (!data.error) {
+        setNr((prev) => ({ ...prev, name: prev.name || data.title || f.name, hours: prev.hours || (data.pageCount ? String(Math.round(data.pageCount / 15)) : ''), notes: prev.notes || (data.summary || ''), file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary } }))
+      } else { setFileErr('Could not read that file. You can type the details instead.') }
+    } catch { setFileErr('Could not read that file. You can type the details instead.') } finally { setFileLoading(false) }
+    e.target.value = ''
   }
 
   const toggleDone = (i) => set('resources', form.resources.map((r, idx) => idx === i ? { ...r, done: !r.done } : r))
@@ -149,7 +170,7 @@ export default function Settings() {
 
           {/* Resources */}
           <div>
-            <label className={label} style={{ color: 'var(--text)' }}>Resources</label>
+            <label className={label} style={{ color: 'var(--text)' }}>What you're learning from</label>
 
             {form.resources.length > 0 && (
               <div className="space-y-2 mb-3">
@@ -195,12 +216,24 @@ export default function Settings() {
                 <input className="w-20 px-2 py-2.5 text-sm outline-none bg-transparent text-center" placeholder="hrs"
                   style={{ color: 'var(--text)', borderLeft: '1px solid var(--panel-border)' }}
                   value={nr.hours} onChange={(e) => setNr({ ...nr, hours: e.target.value })} />
+                <label className="w-10 shrink-0 flex items-center justify-center cursor-pointer transition-opacity hover:opacity-75" style={{ borderLeft: '1px solid var(--panel-border)', color: 'var(--text-soft)' }} title="Upload a PDF or PPT">
+                  {fileLoading ? <Loader size={15} className="animate-spin" /> : <Paperclip size={15} />}
+                  <input type="file" accept=".pdf,.ppt,.pptx" className="hidden" onChange={handleFileUpload} />
+                </label>
                 <button onClick={addResource}
                   className="w-10 h-full flex items-center justify-center transition-opacity hover:opacity-75"
                   style={{ color: 'var(--primary)', borderLeft: '1px solid var(--panel-border)' }}>
                   <Plus size={18} />
                 </button>
               </div>
+              {nr.file && (
+                <div className="px-3.5 py-1.5 text-xs flex items-center gap-1.5" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--primary)' }}>
+                  <Paperclip size={11} /> {nr.file.name}{nr.file.pageCount ? ` (${nr.file.pageCount} pages)` : nr.file.topics?.length ? ` (${nr.file.topics.length} topics)` : ''}
+                </div>
+              )}
+              {fileErr && (
+                <div className="px-3.5 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>{fileErr}</div>
+              )}
               <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course)"
                 style={{ color: 'var(--text)', borderBottom: nr.notes ? '1px solid var(--panel-border)' : 'none' }}
                 value={nr.url} onChange={(e) => setNr({ ...nr, url: e.target.value })} />
