@@ -265,7 +265,7 @@ export default function Onboarding() {
                 )}
                 <div className="mb-3" style={{ border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden' }}>
                   <div className="flex">
-                    <input className="flex-1 px-3 py-2.5 text-sm outline-none bg-transparent" style={{ color: 'var(--text)' }} placeholder="e.g. Andrew Ng ML Course 1 (Coursera)" value={nr.name} onChange={(e) => setNr({ ...nr, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
+                    <input className="flex-1 px-3 py-2.5 text-sm outline-none bg-transparent" style={{ color: 'var(--text)' }} placeholder="e.g. Andrew Ng ML Course 1 (Coursera)" value={nr.name} onChange={(e) => { setNr({ ...nr, name: e.target.value }); setFileErr('') }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                     <input className="w-20 px-3 py-2.5 text-sm outline-none text-center bg-transparent" style={{ color: 'var(--text)', borderLeft: '1px solid var(--panel-border)' }} placeholder="~hrs" value={nr.hours} onChange={(e) => setNr({ ...nr, hours: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                     <label className="w-10 shrink-0 flex items-center justify-center cursor-pointer text-soft hover:opacity-75 transition-opacity" style={{ borderLeft: '1px solid var(--panel-border)' }} title="Upload PDF or PPT">
                       {fileLoading ? <Loader size={14} className="animate-spin" /> : <Paperclip size={14} />}
@@ -282,7 +282,7 @@ export default function Onboarding() {
                     <div className="px-3 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>{fileErr}</div>
                   )}
                   <div className="flex items-center" style={{ borderTop: '1px solid var(--panel-border)' }}>
-                    <input className="flex-1 px-3 py-2 text-sm outline-none bg-transparent" style={{ color: 'var(--text)', opacity: 0.8 }} placeholder="YouTube or course link (optional)" value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setUrlErr(false) }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
+                    <input className="flex-1 px-3 py-2 text-sm outline-none bg-transparent" style={{ color: 'var(--text)', opacity: 0.8 }} placeholder="YouTube or course link (optional)" value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setUrlErr(false); setFileErr('') }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                     {isYouTube(nr.url) && (
                       <button onClick={analyzeUrl} disabled={urlLoading} title="Let Logr watch this video to find its length and topics"
                         className="shrink-0 mr-2 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-opacity hover:opacity-80"

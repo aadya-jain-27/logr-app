@@ -212,7 +212,7 @@ export default function Settings() {
             <div style={{ border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden' }}>
               <div className="flex" style={{ borderBottom: nr.url || nr.notes ? '1px solid var(--panel-border)' : 'none' }}>
                 <input className="flex-1 px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Add a resource name"
-                  style={{ color: 'var(--text)' }} value={nr.name} onChange={(e) => setNr({ ...nr, name: e.target.value })} />
+                  style={{ color: 'var(--text)' }} value={nr.name} onChange={(e) => { setNr({ ...nr, name: e.target.value }); setFileErr('') }} />
                 <input className="w-20 px-2 py-2.5 text-sm outline-none bg-transparent text-center" placeholder="hrs"
                   style={{ color: 'var(--text)', borderLeft: '1px solid var(--panel-border)' }}
                   value={nr.hours} onChange={(e) => setNr({ ...nr, hours: e.target.value })} />
@@ -236,7 +236,7 @@ export default function Settings() {
               )}
               <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course)"
                 style={{ color: 'var(--text)', borderBottom: nr.notes ? '1px solid var(--panel-border)' : 'none' }}
-                value={nr.url} onChange={(e) => setNr({ ...nr, url: e.target.value })} />
+                value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setFileErr('') }} />
               {nr.url && (
                 <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
                   placeholder="Constraints, e.g. finish today..."
