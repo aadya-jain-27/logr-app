@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
@@ -56,6 +56,7 @@ export default function Today() {
   const [path, setPath] = useState(() => pathDay(profile))
   const [extras, setExtras] = useState(() => getExtras())
   const [newExtra, setNewExtra] = useState('')
+  const loadedDateRef = useRef(new Date().toDateString())
 
   const generate = useCallback(async () => {
     if (!profile) return
@@ -101,6 +102,23 @@ export default function Today() {
     } else { generate() } // no cache, or a broken zero minute plan, so replan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // If the tab was left open past midnight, notice the new day on return and shape a fresh plan.
+  useEffect(() => {
+    if (!profile) return
+    const check = () => {
+      const today = new Date().toDateString()
+      if (today !== loadedDateRef.current && !cap.rest) {
+        loadedDateRef.current = today
+        generate()
+      }
+    }
+    window.addEventListener('focus', check)
+    const onVis = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', onVis) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, cap.rest])
 
   // Quietly shape the overall path once, so "day N" and the path view are ready to glance at.
   useEffect(() => {
