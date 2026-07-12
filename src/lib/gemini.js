@@ -17,6 +17,10 @@ Time they can give today: about ${minutesToday} minutes total.
 ${resources && resources.length ? `They are learning from these specific resources only. Do not invent or suggest other materials. Plan the NEXT chunk of the relevant one(s) for today, progressing from what they have already done. Read the timing note on each resource as ordinary language in the student's own words, not by matching keywords, and honor what it means. If the note implies today or now, include that resource today. If it implies spreading over several days, today gets one fair chunk, not the whole thing. Never plan more than the available minutes today, and if something is longer than today's time, plan as much as fits and say so honestly in acknowledgements. For "source", use a short human-readable name like the resource name or platform. Never put a URL in "source". If a link is provided, reference that specific resource by name in the task title:\n${resources.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ' (length unknown, estimate it)'}${r.url ? ` [${r.url}]` : ''}${r.file ? ` | ${r.file.pageCount ? `${r.file.pageCount} pages, ` : ''}${(r.file.topics || []).length ? `covers: ${(r.file.topics || []).slice(0, 8).join(', ')}` : ''}` : ''}${r.notes ? ` | constraints: ${sanitize(r.notes, 300)}` : ''}`).join('\n')}\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.map(s => sanitize(s, 100)).join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}${todaysCommitments && todaysCommitments.length ? `Today the student also has these fixed commitments to handle: ${todaysCommitments.map((c) => `${sanitize(c.name, 100)} (${c.type})`).join(', ')}. Their study time today is already reduced to leave room for these. Keep it gentle, and add a short acknowledgement that today is kept lighter because of them.\n` : ''}
 Rules:
 - Plan ONLY today. Usually 2 to 4 small, specific, doable tasks. The tasks together must fit within ${minutesToday} minutes and must never exceed it.
+- Task minutes must be honest working time for what the task says. Never assign a sliver like 1 to 10 minutes; nobody memorizes or learns anything real in 4 minutes. Every task gets at least 15 minutes, and most should get 25 to 60.
+- If a resource note states an amount of time (for example "1 hour today"), give it exactly that much time today, not less.
+- When a long resource is being spread over days, today's chunk must be a solid block of at least 30 minutes. Fewer days with solid chunks beats many days of tiny slivers. If today truly has no room for a 30 minute block of it, leave that resource for another day rather than planning a token few minutes.
+- Prefer fewer, bigger tasks over many tiny ones. If today's time is short, cut the number of tasks, never their realism.
 - Each task is a concrete action (not vague). For "source", use a short human-readable name like the resource name or platform (e.g. "Pandas tutorial", "Coursera", "Chapter 3"). Never put a URL in "source".
 - Every task must be distinct. Never repeat a task or list the same thing twice.
 - Keep it gentle and achievable. Never overload an overwhelmed student.
@@ -53,7 +57,7 @@ Make it feel handmade for THIS goal:
 - Phase titles must be specific to the goal, not generic. Good: "Python and data handling", "Supervised learning and a first model", "DSA and interview prep". Bad: "Building foundations", "Applying knowledge".
 - Each phase names the concrete skills or topics it covers and the resources it draws on.
 - Include two or three portfolio projects to build that prove the skill, and encourage pushing each to GitHub.
-- Fill "schedule": give each resource the STUDENT actually listed a day range that honors what its note MEANS, read as ordinary language in the student's own words, never by matching exact keywords. If the note implies today or now (for example "today for relaxing", "just today", "do it now", "quick one today"), set dayStart and dayEnd both to 1. If it implies spreading over a period (for example "across two weeks", "over the weekend", "a little each day"), size the span to match. With no note, give a sensible span from the resource length. Only the student's own listed resources go here, never materials you added.
+- Fill "schedule": give each resource the STUDENT actually listed a day range that honors what its note MEANS, read as ordinary language in the student's own words, never by matching exact keywords. If the note implies today or now (for example "today for relaxing", "just today", "do it now", "quick one today"), set dayStart and dayEnd both to 1. If it implies spreading over a period (for example "across two weeks", "over the weekend", "a little each day"), size the span to match, but assume real sessions of at least 30 minutes each: a 3 hour video is about six such sessions, so give it around six study days within that period, not a sliver every single day. With no note, give a sensible span from the resource length using the same at least 30 minutes per session rule. Only the student's own listed resources go here, never materials you added.
 
 Rules:
 - Be realistic about pace for their hours. It is fine to finish a little before the deadline. Never cram, and never pad with filler just to fill time.
@@ -68,7 +72,7 @@ Return STRICT JSON in exactly this shape, nothing else:
     { "title": "specific phase title", "dayStart": number, "dayEnd": number, "focus": "one line on the concrete skills this phase builds", "resources": ["specific resource or topic names this phase uses"] }
   ],
   "schedule": [
-    { "resource": "the student's own resource name, exactly as they wrote it", "dayStart": number, "dayEnd": number }
+    { "resource": "the student's own resource name, exactly as they wrote it, with nothing added like hours or notes", "dayStart": number, "dayEnd": number }
   ],
   "projects": [
     { "title": "string", "what": "one or two sentences on what to build", "proves": "the skill it demonstrates to a reviewer" }
@@ -158,30 +162,63 @@ async function topicsFromText(key, title, description) {
   return Array.isArray(out.topics) ? out.topics.slice(0, 8) : []
 }
 
-// Reads a YouTube link. Fast path scrapes the watch page for exact length and title;
-// only topics use the model (a quick text call). Falls back to full video understanding.
+// Pulls the video id out of any YouTube link form (youtu.be, watch, shorts, embed, live).
+function youTubeId(url) {
+  const m = String(url || '').match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+
+// YouTube's own player API. Unlike scraping the watch page, this also works from
+// datacenter IPs (Vercel), where YouTube serves the page without video metadata.
+async function youTubePlayerInfo(videoId) {
+  const r = await fetch('https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      context: { client: { clientName: 'WEB', clientVersion: '2.20240726.00.00', hl: 'en' } },
+      videoId,
+    }),
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  const v = d?.videoDetails
+  if (!v?.title || !Number(v.lengthSeconds)) return null
+  return { title: v.title, secs: Number(v.lengthSeconds), desc: String(v.shortDescription || '') }
+}
+
+async function youTubePageInfo(url) {
+  const page = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Cookie: 'CONSENT=YES+1',
+    },
+  })
+  if (!page.ok) return null
+  const html = await page.text()
+  const secs = Number((html.match(/"lengthSeconds":"(\d+)"/) || [])[1] || 0)
+  if (!secs) return null
+  return {
+    title: decodeEntities((html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || ''),
+    secs,
+    desc: decodeEntities((html.match(/<meta property="og:description" content="([^"]*)"/) || [])[1] || ''),
+  }
+}
+
+// Reads a YouTube link. Tries the player API, then the watch page, for exact length and
+// title; only topics use the model (a quick text call). Falls back to video understanding.
 export async function parseUrl(key, url) {
-  try {
-    const page = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        Cookie: 'CONSENT=YES+1',
-      },
-    })
-    if (page.ok) {
-      const html = await page.text()
-      const secs = Number((html.match(/"lengthSeconds":"(\d+)"/) || [])[1] || 0)
-      const title = decodeEntities((html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || '')
-      const desc = decodeEntities((html.match(/<meta property="og:description" content="([^"]*)"/) || [])[1] || '')
-      if (secs > 0) {
-        let topics = []
-        try { topics = await topicsFromText(key, title, desc) } catch { /* topics are optional */ }
-        return { title, hours: formatLength(secs), topics, summary: desc.slice(0, 300) }
-      }
-    }
-  } catch { /* fall through to video understanding */ }
-  return parseUrlViaVideo(key, url)
+  const id = youTubeId(url)
+  const canonical = id ? `https://www.youtube.com/watch?v=${id}` : url
+  let info = null
+  if (id) { try { info = await youTubePlayerInfo(id) } catch { /* try the page next */ } }
+  if (!info) { try { info = await youTubePageInfo(canonical) } catch { /* fall through */ } }
+  if (info) {
+    let topics = []
+    try { topics = await topicsFromText(key, info.title, info.desc.slice(0, 800)) } catch { /* topics are optional */ }
+    return { title: info.title, hours: formatLength(info.secs), topics, summary: info.desc.slice(0, 300) }
+  }
+  return parseUrlViaVideo(key, canonical)
 }
 
 // Fallback only: let the model watch the whole video. Slower, so we try the scrape first.

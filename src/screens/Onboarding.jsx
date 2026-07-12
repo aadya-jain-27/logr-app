@@ -59,6 +59,8 @@ export default function Onboarding() {
     if (!nr.name.trim()) return
     set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim() || nr.file?.url || '', notes: nr.notes.trim(), file: nr.file }] })
     setNr({ name: '', hours: '', url: '', notes: '', file: null })
+    setUrlErr(false)
+    setFileErr('')
   }
   const handleFileUpload = async (e) => {
     const f = e.target.files?.[0]
@@ -265,7 +267,7 @@ export default function Onboarding() {
                 )}
                 <div className="mb-3" style={{ border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden' }}>
                   <div className="flex">
-                    <input className="flex-1 px-3 py-2.5 text-sm outline-none bg-transparent" style={{ color: 'var(--text)' }} placeholder="e.g. Andrew Ng ML Course 1 (Coursera)" value={nr.name} onChange={(e) => { setNr({ ...nr, name: e.target.value }); setFileErr('') }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
+                    <input className="flex-1 px-3 py-2.5 text-sm outline-none bg-transparent" style={{ color: 'var(--text)' }} placeholder="e.g. Andrew Ng ML Course 1 (Coursera)" value={nr.name} onChange={(e) => { setNr({ ...nr, name: e.target.value }); setFileErr(''); setUrlErr(false) }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                     <input className="w-20 px-3 py-2.5 text-sm outline-none text-center bg-transparent" style={{ color: 'var(--text)', borderLeft: '1px solid var(--panel-border)' }} placeholder="~hrs" value={nr.hours} onChange={(e) => setNr({ ...nr, hours: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                     <label className="w-10 shrink-0 flex items-center justify-center cursor-pointer text-soft hover:opacity-75 transition-opacity" style={{ borderLeft: '1px solid var(--panel-border)' }} title="Upload PDF or PPT">
                       {fileLoading ? <Loader size={14} className="animate-spin" /> : <Paperclip size={14} />}
