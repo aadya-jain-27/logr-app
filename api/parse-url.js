@@ -7,8 +7,8 @@ export default async function handler(req, res) {
     res.status(200).json({ error: 'no_key' }); return
   }
   try {
-    const { url } = req.body || {}
-    const result = await parseUrl(key, url)
+    const { url, title, seconds } = req.body || {}
+    const result = await parseUrl(key, url, { title, seconds })
     res.status(200).json(result)
   } catch (e) {
     res.status(200).json({ error: 'parse_failed', detail: String(e) })

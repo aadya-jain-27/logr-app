@@ -7,6 +7,7 @@ import { useScene } from '../theme'
 import { saveProfile, isOnboarded } from '../data/store'
 import { extractFileText } from '../lib/filetext'
 import { isYouTube } from '../lib/util'
+import { getYouTubeMeta } from '../lib/youtube'
 
 const GOAL_SUGGESTIONS = ['Land an ML internship', 'Crack campus placements', 'Learn full-stack web dev', 'Ace this semester', 'Crack GATE', 'Ship a startup project']
 const DEADLINES = ['In 1 month', 'In 3 months', 'In 6 months', 'By end of semester']
@@ -92,7 +93,9 @@ export default function Onboarding() {
     } catch { setFileErr('Could not read that file. You can type the details instead.') } finally { setFileLoading(false) }
     e.target.value = ''
   }
-  // Read a YouTube link to fill in its real length and topics.
+  // Read a YouTube link to fill in its real length and topics. The length is measured
+  // right here in the browser (YouTube blocks our server's requests on Vercel), then the
+  // server only needs a quick text call for the topics.
   const analyzeUrl = async () => {
     const url = nr.url.trim()
     if (!url) return
@@ -100,7 +103,8 @@ export default function Onboarding() {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 40000)
     try {
-      const res = await fetch('/api/parse-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: ctrl.signal })
+      const meta = await getYouTubeMeta(url)
+      const res = await fetch('/api/parse-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, title: meta?.title, seconds: meta?.seconds }), signal: ctrl.signal })
       const data = await res.json()
       if (!data.error && (data.hours || data.title || (data.topics && data.topics.length))) {
         setNr((prev) => {

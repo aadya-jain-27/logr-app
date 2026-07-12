@@ -178,6 +178,7 @@ async function youTubePlayerInfo(videoId) {
       context: { client: { clientName: 'WEB', clientVersion: '2.20240726.00.00', hl: 'en' } },
       videoId,
     }),
+    signal: AbortSignal.timeout(6000),
   })
   if (!r.ok) return null
   const d = await r.json()
@@ -193,6 +194,7 @@ async function youTubePageInfo(url) {
       'Accept-Language': 'en-US,en;q=0.9',
       Cookie: 'CONSENT=YES+1',
     },
+    signal: AbortSignal.timeout(8000),
   })
   if (!page.ok) return null
   const html = await page.text()
@@ -205,13 +207,15 @@ async function youTubePageInfo(url) {
   }
 }
 
-// Reads a YouTube link. Tries the player API, then the watch page, for exact length and
-// title; only topics use the model (a quick text call). Falls back to video understanding.
-export async function parseUrl(key, url) {
+// Reads a YouTube link. If the browser already measured the video (hint), only topics
+// need the model. Otherwise tries the player API, then the watch page, for exact length
+// and title; only topics use the model (a quick text call). Falls back to video understanding.
+export async function parseUrl(key, url, hint) {
   const id = youTubeId(url)
   const canonical = id ? `https://www.youtube.com/watch?v=${id}` : url
   let info = null
-  if (id) { try { info = await youTubePlayerInfo(id) } catch { /* try the page next */ } }
+  if (hint && Number(hint.seconds) > 0) info = { title: String(hint.title || ''), secs: Number(hint.seconds), desc: '' }
+  if (!info && id) { try { info = await youTubePlayerInfo(id) } catch { /* try the page next */ } }
   if (!info) { try { info = await youTubePageInfo(canonical) } catch { /* fall through */ } }
   if (info) {
     let topics = []

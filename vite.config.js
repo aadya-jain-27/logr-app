@@ -33,8 +33,8 @@ function logrApi(env) {
           const key = env.GEMINI_API_KEY
           if (!key || key.includes('your_free_gemini')) { res.end(JSON.stringify({ error: 'no_key' })); return }
           try {
-            const { url } = JSON.parse(body || '{}')
-            const result = await parseUrl(key, url)
+            const { url, title, seconds } = JSON.parse(body || '{}')
+            const result = await parseUrl(key, url, { title, seconds })
             res.end(JSON.stringify(result))
           } catch (e) {
             res.end(JSON.stringify({ error: 'parse_failed', detail: String(e) }))
