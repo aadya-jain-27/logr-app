@@ -24,8 +24,9 @@ export default function TopBar() {
         </div>
 
         {/* Scene switcher + sound */}
-        <div className="flex items-center gap-3">
-          <div className="panel flex items-center gap-2.5 px-3 py-2.5 rounded-full">
+        <div className="flex items-center gap-1.5 md:gap-3">
+          {/* Scene switcher is hidden on small screens to keep nav and settings reachable; worlds are also switchable in Settings. */}
+          <div className="panel hidden sm:flex items-center gap-2.5 px-3 py-2.5 rounded-full">
             {SCENES.map((s) => {
               const on = s.id === scene
               return (

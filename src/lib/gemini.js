@@ -207,46 +207,23 @@ async function youTubePageInfo(url) {
   }
 }
 
-// Reads a YouTube link. If the browser already measured the video (hint), only topics
-// need the model. Otherwise tries the player API, then the watch page, for exact length
-// and title; only topics use the model (a quick text call). Falls back to video understanding.
+// Reads a YouTube link. In the browser the video is measured first and passed as a hint,
+// so this usually only needs a quick topics call. Server side it also tries YouTube's
+// player API and then the watch page, but YouTube blocks datacenter IPs (such as Vercel),
+// so when every path fails it returns a graceful error quickly instead of hanging. Only
+// YouTube links are supported, so a non YouTube link returns an error rather than a guess.
 export async function parseUrl(key, url, hint) {
   const id = youTubeId(url)
-  const canonical = id ? `https://www.youtube.com/watch?v=${id}` : url
   let info = null
-  if (hint && Number(hint.seconds) > 0) info = { title: String(hint.title || ''), secs: Number(hint.seconds), desc: '' }
-  if (!info && id) { try { info = await youTubePlayerInfo(id) } catch { /* try the page next */ } }
-  if (!info) { try { info = await youTubePageInfo(canonical) } catch { /* fall through */ } }
-  if (info) {
-    let topics = []
-    try { topics = await topicsFromText(key, info.title, info.desc.slice(0, 800)) } catch { /* topics are optional */ }
-    return { title: info.title, hours: formatLength(info.secs), topics, summary: info.desc.slice(0, 300) }
+  if (hint && Number(hint.seconds) > 0) {
+    info = { title: String(hint.title || ''), secs: Number(hint.seconds), desc: '' }
+  } else if (id) {
+    const canonical = `https://www.youtube.com/watch?v=${id}`
+    try { info = await youTubePlayerInfo(id) } catch { /* try the page next */ }
+    if (!info) { try { info = await youTubePageInfo(canonical) } catch { /* fall through */ } }
   }
-  return parseUrlViaVideo(key, canonical)
-}
-
-// Fallback only: let the model watch the whole video. Slower, so we try the scrape first.
-async function parseUrlViaVideo(key, url) {
-  const prompt = 'This is a YouTube video a student wants to study from. Return JSON: { "title": string, "hours": string (approximate length written like "1h 15m" or "45m"), "topics": string[] (up to 8 key topics it covers), "summary": string (2 to 3 sentences) }. Do not use dashes or hyphens. Nothing else.'
-  const candidates = [...new Set(['gemini-2.5-flash', 'gemini-2.0-flash', ...(cachedModel ? [cachedModel] : []), ...(await discoverModels(key))])]
-  let lastErr = 'no models available'
-  for (const model of candidates) {
-    let r
-    try {
-      r = await fetch(`${API}/models/${model}:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ file_data: { file_uri: url } }, { text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, mediaResolution: 'MEDIA_RESOLUTION_LOW', thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      })
-    } catch (e) { lastErr = String(e); continue }
-    if (r.status === 429 || r.status === 404 || r.status === 400) { lastErr = `${model}: ${r.status}`; continue }
-    if (!r.ok) { lastErr = `${model}: ${r.status}`; continue }
-    const data = await r.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-    return JSON.parse(text)
-  }
-  throw new Error(lastErr)
+  if (!info) return { error: id ? 'unreadable' : 'not_youtube' }
+  let topics = []
+  try { topics = await topicsFromText(key, info.title, info.desc.slice(0, 800)) } catch { /* topics are optional */ }
+  return { title: info.title, hours: formatLength(info.secs), topics, summary: info.desc.slice(0, 300) }
 }
