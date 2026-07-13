@@ -4,6 +4,7 @@ const PLAN_KEY = 'logr-plan'
 const HISTORY_KEY = 'logr-history'
 const ROADMAP_KEY = 'logr-roadmap'
 const EXTRAS_KEY = 'logr-extras'
+const COVERED_KEY = 'logr-covered'
 
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
@@ -38,6 +39,25 @@ export function getCachedPlan() {
 export function savePlan(plan) {
   localStorage.setItem(PLAN_KEY, JSON.stringify({ date: new Date().toDateString(), sig: planSignature(getProfile()), plan }))
   logProgress(plan) // keep history in sync on every save and check-off
+  recordCovered(plan) // remember completed work so tomorrow's plan never repeats it
+}
+
+// A rolling record of work the student has actually finished, so the daily planner can
+// move forward instead of re-planning the same material once a resource is exhausted.
+export function getCovered() {
+  try { return JSON.parse(localStorage.getItem(COVERED_KEY)) || [] } catch { return [] }
+}
+function recordCovered(plan) {
+  const done = (plan?.tasks || []).filter((t) => t.done && t.title).map((t) => t.title.trim())
+  if (!done.length) return
+  const seen = new Set()
+  const merged = [...done, ...getCovered()].filter((title) => {
+    const k = title.toLowerCase()
+    if (!k || seen.has(k)) return false
+    seen.add(k)
+    return true
+  }).slice(0, 60) // keep it recent and prompt-sized
+  localStorage.setItem(COVERED_KEY, JSON.stringify(merged))
 }
 export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)

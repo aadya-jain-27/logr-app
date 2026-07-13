@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
-import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras } from '../data/store'
+import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered } from '../data/store'
 import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
 import { useFocus } from '../focus'
 
@@ -45,6 +45,7 @@ export default function Today() {
   const cap = profile ? todayCapacity(profile) : { minutes: 0, rest: false, dayType: '' }
 
   const [status, setStatus] = useState('loading')
+  const [caughtUp, setCaughtUp] = useState(false)
   const [tasks, setTasks] = useState([])
   const [meta, setMeta] = useState({ goalProgress: null, pace: null, acknowledgements: [] })
   const [errKind, setErrKind] = useState(null)
@@ -74,13 +75,24 @@ export default function Today() {
     const plan = await requestPlan({
       goal: profile.goal, deadline: profile.deadline, minutesToday,
       dayType: cap.dayType, resources: profile.resources, carriedOver, daysAway, todaysCommitments,
+      covered: getCovered(),
       date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     })
-    if (plan && Array.isArray(plan.tasks) && plan.tasks.length && !plan.error) {
+    if (plan && !plan.error && Array.isArray(plan.tasks) && plan.tasks.length) {
       const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null, acknowledgements: Array.isArray(plan.acknowledgements) ? plan.acknowledgements : [] }
       savePlan(stored)
+      setCaughtUp(false)
       setTasks(stored.tasks)
       setMeta({ goalProgress: stored.goalProgress, pace: stored.pace, acknowledgements: stored.acknowledgements })
+      setStatus('ready')
+    } else if (plan && !plan.error && plan.caughtUp) {
+      // Nothing genuinely new left in the student's resources. Cache this so we don't re-ask
+      // every visit, and invite them to add more rather than repeating finished work.
+      const stored = { tasks: [], caughtUp: true, goalProgress: plan.goalProgress ?? null, pace: null, acknowledgements: [] }
+      savePlan(stored)
+      setCaughtUp(true)
+      setTasks([])
+      setMeta({ goalProgress: stored.goalProgress, pace: null, acknowledgements: [] })
       setStatus('ready')
     } else {
       setErrKind(plan?.error === 'no_key' ? 'no_key' : 'failed')
@@ -95,7 +107,12 @@ export default function Today() {
     if (cap.rest) { setStatus('rest'); return }
     const cached = getCachedPlan()
     const cachedMinutes = (cached?.tasks || []).reduce((s, t) => s + (t.minutes || 0), 0)
-    if (cached?.tasks?.length && cachedMinutes > 0) {
+    if (cached?.caughtUp) {
+      setCaughtUp(true)
+      setTasks([])
+      setMeta({ goalProgress: cached.goalProgress ?? null, pace: null, acknowledgements: [] })
+      setStatus('ready')
+    } else if (cached?.tasks?.length && cachedMinutes > 0) {
       setTasks(withIds(cached.tasks))
       setMeta({ goalProgress: cached.goalProgress ?? null, pace: cached.pace || null, acknowledgements: Array.isArray(cached.acknowledgements) ? cached.acknowledgements : [] })
       setStatus('ready')
@@ -258,6 +275,15 @@ export default function Today() {
 
         {status === 'ready' && (
           <>
+            {caughtUp ? (
+              <div className="mb-2 px-4 py-6 rounded-2xl text-center" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)' }}>
+                <Sparkles size={26} style={{ color: 'var(--primary)' }} className="mx-auto mb-3" />
+                <p className="text-[15px] font-medium" style={{ color: 'var(--text)' }}>You've worked through everything you gave me for now.</p>
+                <p className="text-soft text-sm mt-1.5 mb-4 max-w-xs mx-auto">Add your next resource or goal in Settings and I'll keep the path going, with no repeats.</p>
+                <Link to="/settings" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"><Settings size={14} /> Open Settings</Link>
+              </div>
+            ) : (
+            <>
             <p className="text-soft text-[15px] mb-6 leading-relaxed">
               {remaining === 0
                 ? "You've done everything for today. Rest easy."
@@ -351,6 +377,8 @@ export default function Today() {
                 </motion.div>
               ))}
             </div>
+            </>
+            )}
 
             {/* Your own additions for today, kept even when the AI plan re-plans */}
             {extras.length > 0 && (

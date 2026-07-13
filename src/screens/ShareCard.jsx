@@ -9,15 +9,16 @@ export default function ShareCard() {
   const cardRef = useRef()
   const profile = getProfile()
   const cached = getCachedPlan()
+  const tasks = cached?.tasks || []
+  const extras = getExtras() // the student's own additions for today, shown alongside the plan
+  const hasContent = tasks.length + extras.length > 0
 
   useEffect(() => {
-    if (!cached?.tasks?.length) navigate('/today')
-  }, [cached, navigate])
+    if (!hasContent) navigate('/today')
+  }, [hasContent, navigate])
 
-  if (!cached?.tasks?.length) return null
+  if (!hasContent) return null
 
-  const tasks = cached.tasks
-  const extras = getExtras() // the student's own additions for today, shown alongside the plan
   const allItems = [...tasks, ...extras]
   const remaining = allItems.filter((t) => !t.done).length
   const done = allItems.filter((t) => t.done).length
@@ -57,7 +58,7 @@ export default function ShareCard() {
             <span className="chip flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full">
               <Clock size={11} /> {Math.round((totalMin / 60) * 10) / 10}h
             </span>
-            {cached.goalProgress != null && (
+            {cached?.goalProgress != null && (
               <span className="chip flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full">
                 <Sparkles size={11} style={{ color: 'var(--primary)' }} /> {cached.goalProgress}%
               </span>
@@ -99,7 +100,7 @@ export default function ShareCard() {
         <div className="mt-5 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--panel-border)' }}>
           <span className="text-xs text-soft">
             {done === allItems.length ? 'All done.' : `${remaining} left`}
-            {cached.pace ? ` · ${cached.pace}` : ''}
+            {cached?.pace ? ` · ${cached.pace}` : ''}
           </span>
           <span className="text-xs font-medium" style={{ color: 'var(--primary)', fontFamily: 'Fraunces, serif' }}>Logr</span>
         </div>
