@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, Paperclip, Loader } from 'lucide-react'
+import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, Paperclip, Loader, Pencil, X } from 'lucide-react'
 import { getProfile, saveProfile } from '../data/store'
 import { useScene } from '../theme'
 import { SCENES } from '../scenes/scenes'
@@ -28,6 +28,8 @@ export default function Settings() {
   })
 
   const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', file: null })
+  const [editIdx, setEditIdx] = useState(null)
+  const [edit, setEdit] = useState({ name: '', hours: '', url: '', notes: '' })
   const [fileLoading, setFileLoading] = useState(false)
   const [fileErr, setFileErr] = useState('')
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
@@ -62,7 +64,23 @@ export default function Settings() {
   }
 
   const toggleDone = (i) => set('resources', form.resources.map((r, idx) => idx === i ? { ...r, done: !r.done } : r))
-  const removeResource = (i) => set('resources', form.resources.filter((_, idx) => idx !== i))
+  const removeResource = (i) => { if (editIdx === i) cancelEdit(); set('resources', form.resources.filter((_, idx) => idx !== i)) }
+
+  // Editing an existing resource. Changing its name, hours, link, or constraints updates
+  // the saved profile, which changes the plan signature and forces a fresh plan on Today.
+  const startEdit = (i) => {
+    const r = form.resources[i]
+    setEditIdx(i)
+    setEdit({ name: r.name || '', hours: r.hours || '', url: r.url || '', notes: r.notes || '' })
+  }
+  const cancelEdit = () => { setEditIdx(null); setEdit({ name: '', hours: '', url: '', notes: '' }) }
+  const saveEdit = () => {
+    if (!edit.name.trim()) return
+    set('resources', form.resources.map((r, idx) => (idx === editIdx
+      ? { ...r, name: edit.name.trim(), hours: edit.hours.trim(), url: edit.url.trim(), notes: edit.notes.trim() }
+      : r)))
+    cancelEdit()
+  }
 
   const addCommit = () => {
     if (!nc.name.trim() || !nc.date) return
@@ -175,6 +193,32 @@ export default function Settings() {
             {form.resources.length > 0 && (
               <div className="space-y-2 mb-3">
                 {form.resources.map((r, i) => (
+                  editIdx === i ? (
+                    <div key={i} style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflow: 'hidden' }}>
+                      <div className="flex" style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                        <input autoFocus className="flex-1 px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Resource name"
+                          style={{ color: 'var(--text)' }} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }} />
+                        <input className="w-20 px-2 py-2.5 text-sm outline-none bg-transparent text-center" placeholder="hrs"
+                          style={{ color: 'var(--text)', borderLeft: '1px solid var(--panel-border)' }}
+                          value={edit.hours} onChange={(e) => setEdit({ ...edit, hours: e.target.value })} />
+                      </div>
+                      <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course)"
+                        style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
+                        value={edit.url} onChange={(e) => setEdit({ ...edit, url: e.target.value })} />
+                      <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
+                        placeholder="Constraints, e.g. finish today, divide across 3 days (optional)"
+                        style={{ color: 'var(--text)' }} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
+                      <div className="flex items-center justify-end gap-2 px-3 py-2" style={{ borderTop: '1px solid var(--panel-border)' }}>
+                        <button onClick={cancelEdit} className="text-xs px-3 py-1.5 rounded-full flex items-center gap-1 hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}>
+                          <X size={12} /> Cancel
+                        </button>
+                        <button onClick={saveEdit} disabled={!edit.name.trim()} className="btn-primary text-xs px-3.5 py-1.5 rounded-full flex items-center gap-1 font-semibold" style={{ opacity: edit.name.trim() ? 1 : 0.5 }}>
+                          <Check size={12} /> Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                   <div key={i} className="chip rounded-xl px-3.5 py-2.5 flex items-center gap-2.5"
                     style={{ opacity: r.done ? 0.5 : 1 }}>
                     <button onClick={() => toggleDone(i)}
@@ -201,16 +245,20 @@ export default function Settings() {
                       </div>
                       {r.notes && <div className="text-xs text-soft mt-0.5 truncate">{r.notes}</div>}
                     </div>
-                    <button onClick={() => removeResource(i)} className="shrink-0 hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}>
+                    <button onClick={() => startEdit(i)} className="shrink-0 hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }} title="Edit">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => removeResource(i)} className="shrink-0 hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }} title="Remove">
                       <Trash2 size={13} />
                     </button>
                   </div>
+                  )
                 ))}
               </div>
             )}
 
             <div style={{ border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden' }}>
-              <div className="flex" style={{ borderBottom: nr.url || nr.notes ? '1px solid var(--panel-border)' : 'none' }}>
+              <div className="flex" style={{ borderBottom: '1px solid var(--panel-border)' }}>
                 <input className="flex-1 px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Add a resource name"
                   style={{ color: 'var(--text)' }} value={nr.name} onChange={(e) => { setNr({ ...nr, name: e.target.value }); setFileErr('') }} />
                 <input className="w-20 px-2 py-2.5 text-sm outline-none bg-transparent text-center" placeholder="hrs"
@@ -234,15 +282,13 @@ export default function Settings() {
               {fileErr && (
                 <div className="px-3.5 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>{fileErr}</div>
               )}
-              <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course)"
-                style={{ color: 'var(--text)', borderBottom: nr.notes ? '1px solid var(--panel-border)' : 'none' }}
+              <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course, optional)"
+                style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
                 value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setFileErr('') }} />
-              {nr.url && (
-                <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
-                  placeholder="Constraints, e.g. finish today..."
-                  style={{ color: 'var(--text)' }}
-                  value={nr.notes} onChange={(e) => setNr({ ...nr, notes: e.target.value })} />
-              )}
+              <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
+                placeholder="Constraints, e.g. finish today, divide across 3 days (optional)"
+                style={{ color: 'var(--text)' }}
+                value={nr.notes} onChange={(e) => setNr({ ...nr, notes: e.target.value })} />
             </div>
             <p className="text-xs text-soft mt-2">Check a resource to mark it complete. Completed resources won't be planned.</p>
           </div>
