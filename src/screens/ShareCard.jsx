@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Check, Clock, Sparkles, X } from 'lucide-react'
-import { getCachedPlan, getProfile } from '../data/store'
+import { getCachedPlan, getProfile, getExtras } from '../data/store'
 
 export default function ShareCard() {
   const navigate = useNavigate()
@@ -17,9 +17,11 @@ export default function ShareCard() {
   if (!cached?.tasks?.length) return null
 
   const tasks = cached.tasks
-  const remaining = tasks.filter((t) => !t.done).length
-  const done = tasks.filter((t) => t.done).length
-  const totalMin = tasks.reduce((s, t) => s + (t.minutes || 0), 0)
+  const extras = getExtras() // the student's own additions for today, shown alongside the plan
+  const allItems = [...tasks, ...extras]
+  const remaining = allItems.filter((t) => !t.done).length
+  const done = allItems.filter((t) => t.done).length
+  const totalMin = allItems.reduce((s, t) => s + (t.minutes || 0), 0)
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
@@ -78,11 +80,25 @@ export default function ShareCard() {
               <span className="text-xs shrink-0 self-center" style={{ color: 'var(--text-soft)' }}>{t.minutes}m</span>
             </div>
           ))}
+          {extras.map((x) => (
+            <div key={x.id} className="chip rounded-xl p-3.5 flex items-start gap-3"
+              style={{ opacity: x.done ? 0.55 : 1 }}>
+              <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: x.done ? 'var(--primary)' : 'transparent', border: x.done ? 'none' : '2px solid var(--text-soft)', color: 'var(--on-primary)' }}>
+                {x.done && <Check size={11} strokeWidth={3} />}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold" style={{ color: 'var(--text)', textDecoration: x.done ? 'line-through' : 'none' }}>{x.title}</div>
+                <div className="text-soft text-xs mt-0.5">Added by you</div>
+              </div>
+              {x.minutes > 0 && <span className="text-xs shrink-0 self-center" style={{ color: 'var(--text-soft)' }}>{x.minutes}m</span>}
+            </div>
+          ))}
         </div>
 
         <div className="mt-5 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--panel-border)' }}>
           <span className="text-xs text-soft">
-            {done === tasks.length ? 'All done.' : `${remaining} left`}
+            {done === allItems.length ? 'All done.' : `${remaining} left`}
             {cached.pace ? ` · ${cached.pace}` : ''}
           </span>
           <span className="text-xs font-medium" style={{ color: 'var(--primary)', fontFamily: 'Fraunces, serif' }}>Logr</span>
