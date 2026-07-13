@@ -70,11 +70,12 @@ export default function Calendar() {
         return total > 1 ? `${s.resource} (day ${n - s.dayStart + 1} of ${total})` : s.resource
       }).join(', ')
     }
-    // Otherwise fall back to the phase's topics, cycled so consecutive days vary.
+    // On days with no specific resource scheduled, show the phase's theme rather than
+    // recycling resource names day after day (which read as repetition). Your own materials
+    // appear only on their real days above; the rest of a phase shows what it is building.
     const p = phases[pIdx]
     if (!p) return ''
-    const list = (p.resources && p.resources.length) ? p.resources : [p.focus || p.title]
-    return list[(n - p.dayStart + list.length * 99) % list.length]
+    return p.focus || p.title || ''
   }
 
   const today = new Date()

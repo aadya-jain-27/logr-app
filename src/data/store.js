@@ -86,13 +86,53 @@ export function addExtra(title, minutes = 0, dateStr = new Date().toDateString()
 function roadmapSignature(profile) {
   return `${profile?.goal || ''}::${profile?.deadline || ''}::${resourcesSig(profile?.resources)}`
 }
+
+// Turn a length like "1h 34m", "51m", or "2.5" into a number of hours.
+function parseHours(str) {
+  const s = String(str || '').toLowerCase()
+  const h = (s.match(/(\d+(?:\.\d+)?)\s*h/) || [])[1]
+  const m = (s.match(/(\d+)\s*m/) || [])[1]
+  let t = 0
+  if (h) t += parseFloat(h)
+  if (m) t += parseFloat(m) / 60
+  if (!h && !m) { const n = parseFloat(s); if (!Number.isNaN(n)) t = n }
+  return t
+}
+// Roughly one study session (about an hour) per day, capped so a short resource never
+// stretches across weeks. Unknown length stays small.
+function spanForHours(hrs) {
+  if (!hrs || hrs <= 0) return 2
+  return Math.min(8, Math.max(1, Math.ceil(hrs)))
+}
+// The model sometimes stretches one resource across many days (for example reading a
+// "finish by the 14th" note as a 14 day span). Clamp each span to the resource's real
+// length and pack them back to back in the given order, so the calendar shows a tight,
+// progressing plan instead of the same resource repeated for two weeks.
+function normalizeSchedule(schedule, resources) {
+  if (!Array.isArray(schedule) || !schedule.length) return schedule || []
+  const byName = {}
+  ;(resources || []).forEach((r) => { byName[String(r.name || '').trim().toLowerCase()] = r })
+  const ordered = schedule.filter((s) => s && s.resource).sort((a, b) => (a.dayStart || 0) - (b.dayStart || 0))
+  let cursor = Math.max(1, ordered[0]?.dayStart || 1)
+  return ordered.map((s) => {
+    const r = byName[String(s.resource || '').trim().toLowerCase()]
+    const modelSpan = Math.max(1, (s.dayEnd || s.dayStart || 1) - (s.dayStart || 1) + 1)
+    const span = Math.min(modelSpan, spanForHours(parseHours(r?.hours)))
+    const dayStart = cursor
+    const dayEnd = cursor + span - 1
+    cursor = dayEnd + 1
+    return { resource: s.resource, dayStart, dayEnd }
+  })
+}
 export function getRoadmap() {
   try { return JSON.parse(localStorage.getItem(ROADMAP_KEY)) } catch { return null }
 }
-// Returns the cached roadmap only if it still matches the current profile.
+// Returns the cached roadmap only if it still matches the current profile. The schedule is
+// normalized on read too, so roadmaps saved before the span fix also stop repeating.
 export function getValidRoadmap(profile) {
   const saved = getRoadmap()
-  return saved && saved.sig === roadmapSignature(profile) ? saved : null
+  if (!saved || saved.sig !== roadmapSignature(profile)) return null
+  return { ...saved, roadmap: { ...saved.roadmap, schedule: normalizeSchedule(saved.roadmap?.schedule, profile?.resources) } }
 }
 export function saveRoadmap(profile, roadmap) {
   const sig = roadmapSignature(profile)
@@ -101,7 +141,8 @@ export function saveRoadmap(profile, roadmap) {
   // Keep the original start date as long as the goal is unchanged, so adding or editing a
   // resource mid journey does not reset you back to day 1.
   const startDate = prev && prev.goal === goal ? prev.startDate : new Date().toDateString()
-  const record = { sig, goal, startDate, roadmap }
+  const cleaned = roadmap ? { ...roadmap, schedule: normalizeSchedule(roadmap.schedule, profile?.resources) } : roadmap
+  const record = { sig, goal, startDate, roadmap: cleaned }
   localStorage.setItem(ROADMAP_KEY, JSON.stringify(record))
   return record
 }
