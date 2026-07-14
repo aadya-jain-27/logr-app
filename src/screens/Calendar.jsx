@@ -12,6 +12,34 @@ const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); r
 const sameDay = (a, b) => atMidnight(a) === atMidnight(b)
 const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
+// Words that describe how a course is packaged, not which course it is. Dropped before
+// comparing two resource names, so "Andrew Ng ML Course 1 week 3" and "Andrew Ng Machine
+// Learning Course 1 (remaining weeks)" are recognized as the same course, not two things.
+const GENERIC_WORDS = new Set(['the', 'a', 'an', 'of', 'and', 'or', 'for', 'to', 'in', 'on', 'with', 'my', 'your', 'part', 'parts', 'course', 'courses', 'class', 'classes', 'week', 'weeks', 'module', 'modules', 'chapter', 'chapters', 'section', 'sections', 'lesson', 'lessons', 'unit', 'units', 'tutorial', 'tutorials', 'video', 'videos', 'series', 'playlist', 'complete', 'full', 'remaining', 'rest', 'continued', 'onwards'])
+function sigTokens(name) {
+  return new Set(String(name || '').toLowerCase()
+    .replace(/\([^)]*\)/g, ' ') // drop parentheticals like "(remaining weeks)"
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && w.length > 1 && !/^\d+$/.test(w) && !GENERIC_WORDS.has(w)))
+}
+function resourceNumbers(name) {
+  return new Set(String(name || '').match(/\d+/g) || [])
+}
+// Two resource names refer to the same material if they share two or more distinctive words,
+// or one's distinctive words are entirely contained in the other's. But if both name numbers
+// and share none, they are different editions (Course 1 vs Course 2, NeetCode 150 vs 75).
+function sameResource(a, b) {
+  const A = sigTokens(a), B = sigTokens(b)
+  if (!A.size || !B.size) return false
+  const na = resourceNumbers(a), nb = resourceNumbers(b)
+  if (na.size && nb.size && ![...na].some((x) => nb.has(x))) return false
+  let shared = 0
+  for (const t of A) if (B.has(t)) shared++
+  if (shared >= 2) return true
+  return shared >= 1 && (shared === A.size || shared === B.size)
+}
+
 export default function Calendar() {
   const profile = getProfile()
 
@@ -76,8 +104,8 @@ export default function Calendar() {
   }
   // A phase's suggested materials are the named resources it draws on that the student has
   // not already added. Offered as "Suggested" for one tap adding, never auto scheduled.
-  const ownNames = (profile.resources || []).map((r) => String(r.name || '').toLowerCase()).filter(Boolean)
-  const isOwn = (mat) => { const m = String(mat || '').toLowerCase(); return ownNames.some((n) => m.includes(n) || n.includes(m)) }
+  const ownNames = (profile.resources || []).map((r) => String(r.name || '')).filter(Boolean)
+  const isOwn = (mat) => ownNames.some((n) => sameResource(mat, n))
   const suggestedFor = (phase) => [...new Set((phase?.resources || []).filter((mat) => mat && !isOwn(mat)))]
   const addSuggested = (mat) => {
     const prof = getProfile()

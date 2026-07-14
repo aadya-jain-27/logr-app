@@ -24,6 +24,7 @@ Rules:
 - Each task is a concrete action (not vague). For "source", use a short human-readable name like the resource name or platform (e.g. "Pandas tutorial", "Coursera", "Chapter 3"). Never put a URL in "source".
 - Every task must be distinct. Never repeat a task or list the same thing twice, and never plan anything the student already completed on an earlier day (listed above).
 - Never invent filler or generic busywork to fill time. It is better to plan fewer real tasks, or none at all with "caughtUp" true, than to repad finished material.
+- Use what you know about each resource's real structure and length. Never plan a week, module, or chapter that does not exist. For example, if a course has only three weeks and the student is on week 3, that is the last week, so do not plan a "week 4"; treat the resource as nearly finished instead.
 - Keep it gentle and achievable. Never overload an overwhelmed student.
 - Do NOT use em dashes, en dashes, or hyphens between words or numbers. Use commas or periods, and write number ranges with the word "to" (for example, two to three).
 
@@ -54,6 +55,8 @@ Target timeframe: ${dl || 'no fixed deadline, so choose a sensible one and say s
 Time they can usually give: about ${weekdayHours ?? 2} hours on weekdays and ${weekendHours ?? 3} hours on weekends.
 ${res.length ? `The student is currently working from these resources. Anchor the path in them and place each where it truly belongs. Honor any timing note exactly: if a note says finish today, this week, or by a date, schedule that resource at the very start, never late:\n${res.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ''}${r.file?.pageCount ? ` (${r.file.pageCount} pages)` : ''}${r.file?.topics?.length ? `, topics: ${r.file.topics.slice(0, 8).join(', ')}` : ''}${r.notes ? ` | the student said: ${sanitize(r.notes, 200)}` : ''}`).join('\n')}\n` : 'The student has not listed resources yet.\n'}
 Work out what this specific goal genuinely requires from start to finish, then lay it across the timeframe. Where the student's own resources cover a part, use them there. Where the goal needs more than they listed, add specific, mostly free, well known materials BY NAME (real courses, books, sites), never vague advice. Front load what the student is doing right now and anything they marked urgent.
+
+Use what you genuinely know about each named resource's real structure and length. Never invent weeks, modules, chapters, or parts that do not exist. If the student lists a specific part of a course, work out from what you know whether more of that course remains. For example, Andrew Ng's Machine Learning Course 1 has only three weeks, so a student on "week 3" is on the LAST week: treat that course as essentially finished and do NOT suggest nonexistent "remaining weeks". Only continue a course as far as it genuinely goes, and do not re-list a resource the student already named as if it were a new suggestion.
 
 Make it feel handmade for THIS goal:
 - Phase titles must be specific to the goal, not generic. Good: "Python and data handling", "Supervised learning and a first model", "DSA and interview prep". Bad: "Building foundations", "Applying knowledge".
