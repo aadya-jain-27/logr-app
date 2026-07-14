@@ -41,7 +41,7 @@ export default function ShareCard() {
 
       {/* The card — clean, no controls */}
       <div ref={cardRef}
-        className="panel rounded-[32px] w-full max-w-[420px] p-8 relative overflow-hidden"
+        className="panel print-card rounded-[32px] w-full max-w-[420px] p-8 relative overflow-hidden"
         style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.12)' }}>
 
         {/* Subtle top accent */}

@@ -80,3 +80,29 @@
   .field::placeholder { color: var(--text-soft); opacity: 0.7; }
   .field:focus { outline: none; box-shadow: 0 0 0 3px var(--ring); }
 }
+
+/* ============================================================
+   Print (share the plan as a PDF). The scene themes are made for
+   a glass panel over a coloured world, so on a white page their
+   backgrounds get stripped and light themes go nearly invisible.
+   For print we force one calm light card, keep the colours, and
+   show only the plan card, not the app chrome.
+   ============================================================ */
+@media print {
+  :root {
+    --text: #2A2320 !important; --text-soft: #6F675F !important;
+    --primary: #C45B3C !important; --on-primary: #FFFFFF !important;
+    --panel: #FFFFFF !important; --panel-border: #E6E0D7 !important;
+    --chip: #F5F1EA !important; --ring: rgba(0, 0, 0, 0) !important;
+  }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { background: #FFFFFF !important; }
+  /* Print only the plan card, not the top bar, scene, or helper text. */
+  body * { visibility: hidden !important; }
+  .print-card, .print-card * { visibility: visible !important; }
+  .print-card {
+    position: absolute !important; left: 0; right: 0; top: 0.3in; margin: 0 auto !important;
+    box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    border: 1px solid var(--panel-border) !important;
+  }
+}
