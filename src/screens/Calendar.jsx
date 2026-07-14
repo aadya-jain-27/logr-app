@@ -16,19 +16,23 @@ const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'num
 // comparing two resource names, so "Andrew Ng ML Course 1 week 3" and "Andrew Ng Machine
 // Learning Course 1 (remaining weeks)" are recognized as the same course, not two things.
 const GENERIC_WORDS = new Set(['the', 'a', 'an', 'of', 'and', 'or', 'for', 'to', 'in', 'on', 'with', 'my', 'your', 'part', 'parts', 'course', 'courses', 'class', 'classes', 'week', 'weeks', 'module', 'modules', 'chapter', 'chapters', 'section', 'sections', 'lesson', 'lessons', 'unit', 'units', 'tutorial', 'tutorials', 'video', 'videos', 'series', 'playlist', 'complete', 'full', 'remaining', 'rest', 'continued', 'onwards'])
+// Expand common abbreviations so "ML" and "Machine Learning" compare as the same subject,
+// which lets us tell apart two courses by the same author (ML vs Deep Learning).
+const ABBREV = { ml: 'machine learning', dl: 'deep learning', ai: 'artificial intelligence', dsa: 'data structures algorithms', nlp: 'natural language processing', db: 'database', oop: 'object oriented programming' }
 function sigTokens(name) {
   return new Set(String(name || '').toLowerCase()
     .replace(/\([^)]*\)/g, ' ') // drop parentheticals like "(remaining weeks)"
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
+    .flatMap((w) => (ABBREV[w] ? ABBREV[w].split(' ') : [w]))
     .filter((w) => w && w.length > 1 && !/^\d+$/.test(w) && !GENERIC_WORDS.has(w)))
 }
 function resourceNumbers(name) {
   return new Set(String(name || '').match(/\d+/g) || [])
 }
-// Two resource names refer to the same material if they share two or more distinctive words,
-// or one's distinctive words are entirely contained in the other's. But if both name numbers
-// and share none, they are different editions (Course 1 vs Course 2, NeetCode 150 vs 75).
+// Two names refer to the same material only when their distinctive words overlap heavily
+// (most of the shorter name's words appear in the other). Different edition numbers
+// (Course 1 vs Course 2, NeetCode 150 vs 75) always count as different resources.
 function sameResource(a, b) {
   const A = sigTokens(a), B = sigTokens(b)
   if (!A.size || !B.size) return false
@@ -36,8 +40,7 @@ function sameResource(a, b) {
   if (na.size && nb.size && ![...na].some((x) => nb.has(x))) return false
   let shared = 0
   for (const t of A) if (B.has(t)) shared++
-  if (shared >= 2) return true
-  return shared >= 1 && (shared === A.size || shared === B.size)
+  return shared >= 1 && shared / Math.min(A.size, B.size) >= 0.8
 }
 
 export default function Calendar() {
