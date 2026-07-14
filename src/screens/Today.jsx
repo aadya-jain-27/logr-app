@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
-import { getProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered } from '../data/store'
+import { getProfile, saveProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered, recordCompletion } from '../data/store'
 import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
 import { useFocus } from '../focus'
 
@@ -46,6 +46,7 @@ export default function Today() {
 
   const [status, setStatus] = useState('loading')
   const [caughtUp, setCaughtUp] = useState(false)
+  const [justLogged, setJustLogged] = useState([])
   const [tasks, setTasks] = useState([])
   const [meta, setMeta] = useState({ goalProgress: null, pace: null, acknowledgements: [] })
   const [errKind, setErrKind] = useState(null)
@@ -62,6 +63,12 @@ export default function Today() {
   const generate = useCallback(async () => {
     if (!profile) return
     if (cap.rest) { setStatus('rest'); return }
+    // Every resource is marked complete: don't plan generic filler, invite adding more.
+    if ((profile.resources || []).length > 0 && (profile.resources || []).every((r) => r.done)) {
+      savePlan({ tasks: [], caughtUp: true, goalProgress: null, pace: null, acknowledgements: [] })
+      setCaughtUp(true); setTasks([]); setMeta({ goalProgress: null, pace: null, acknowledgements: [] }); setStatus('ready')
+      return
+    }
     const { carriedOver, daysAway } = carryFromPrevious()
     setWelcomeBack(daysAway >= 2 ? daysAway : 0)
     setCarriedTasks(carriedOver)
@@ -157,12 +164,25 @@ export default function Today() {
   // NOW it's safe to conditionally return — all hooks are above this line.
   if (!profile) return <Navigate to="/welcome" replace />
 
+  const activeResources = (profile.resources || []).filter((r) => !r.done)
+
   const replan = () => {
     setConfirmReplan(false)
     clearPlan()
     setWelcomeBack(0)
     setFallbackTasks([])
     generate()
+  }
+
+  // When you're caught up, mark the finished resources complete so they log to your journey.
+  const markMaterialsComplete = () => {
+    const prof = getProfile()
+    const active = (prof.resources || []).filter((r) => !r.done)
+    if (!active.length) return
+    active.forEach((r) => recordCompletion(r.name))
+    saveProfile({ ...prof, resources: (prof.resources || []).map((r) => ({ ...r, done: true })) })
+    savePlan({ tasks: [], caughtUp: true, goalProgress: null, pace: null, acknowledgements: [] })
+    setJustLogged(active.map((r) => r.name))
   }
 
   const toggle = (id) => setTasks((ts) => {
@@ -279,6 +299,16 @@ export default function Today() {
               <div className="mb-2 px-4 py-6 rounded-2xl text-center" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)' }}>
                 <Sparkles size={26} style={{ color: 'var(--primary)' }} className="mx-auto mb-3" />
                 <p className="text-[15px] font-medium" style={{ color: 'var(--text)' }}>You've worked through everything you gave me for now.</p>
+                {activeResources.length > 0 ? (
+                  <div className="mt-3 mb-4">
+                    <p className="text-soft text-sm mb-2.5 max-w-xs mx-auto">Finished {activeResources.map((r) => r.name).join(', ')}? Log it so it shows in your journey.</p>
+                    <button onClick={markMaterialsComplete} className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-full transition-opacity hover:opacity-80" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)', color: 'var(--primary)' }}>
+                      <Check size={14} /> Mark complete
+                    </button>
+                  </div>
+                ) : justLogged.length > 0 ? (
+                  <p className="text-soft text-sm mt-2 mb-4 max-w-xs mx-auto flex items-center justify-center gap-1.5"><Check size={14} style={{ color: 'var(--primary)' }} /> Logged in your journey. Nicely done.</p>
+                ) : null}
                 <p className="text-soft text-sm mt-1.5 mb-4 max-w-xs mx-auto">Add your next resource or goal in Settings and I'll keep the path going, with no repeats.</p>
                 <Link to="/settings" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"><Settings size={14} /> Open Settings</Link>
               </div>

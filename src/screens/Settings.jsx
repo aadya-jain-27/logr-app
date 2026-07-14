@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, Paperclip, Loader, Pencil, X } from 'lucide-react'
-import { getProfile, saveProfile } from '../data/store'
+import { getProfile, saveProfile, reconcileCompletions } from '../data/store'
 import { useScene } from '../theme'
 import { SCENES } from '../scenes/scenes'
 import { requestPermission, scheduleDaily } from '../lib/notify'
@@ -97,6 +97,7 @@ export default function Settings() {
 
   const save = () => {
     saveProfile({ ...raw, ...form, scene: form.scene, weekday: Number(form.wkday) || 2, weekend: Number(form.wkend) || 3, skipWeekends: form.skipWeekend })
+    reconcileCompletions(form.resources) // log any resource ticked complete, un-log any unticked
     setScene(form.scene)
     if (form.notifyAt && notifyPerm === 'granted') scheduleDaily(form.notifyAt)
     setSaved(true)

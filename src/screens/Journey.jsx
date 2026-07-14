@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, Clock, CalendarHeart } from 'lucide-react'
-import { monthStats, getHistory } from '../data/store'
+import { ArrowLeft, CheckCircle2, Clock, CalendarHeart, Check } from 'lucide-react'
+import { monthStats, getHistory, monthCompletions } from '../data/store'
 
 function intensity(minutes) {
   if (!minutes) return 0.1
@@ -38,6 +38,8 @@ export default function Journey() {
   const cells = []
   for (let i = 0; i < firstWeekday; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  const completed = monthCompletions()
 
   const stats = [
     { icon: CheckCircle2, value: tasksDone, label: 'things done' },
@@ -157,6 +159,25 @@ export default function Journey() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {completed.length > 0 && (
+          <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--panel-border)' }}>
+            <div className="flex items-center gap-1.5 mb-3">
+              <CheckCircle2 size={14} style={{ color: 'var(--primary)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Finished this month</p>
+            </div>
+            <div className="space-y-2">
+              {completed.map((c, i) => (
+                <div key={i} className="chip rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'var(--primary)', color: 'var(--on-primary)' }}>
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>{c.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="text-soft text-xs text-center mt-4" style={{ opacity: 0.85 }}>
           We only ever show what you did, never what you missed.

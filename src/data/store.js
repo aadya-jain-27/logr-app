@@ -5,6 +5,7 @@ const HISTORY_KEY = 'logr-history'
 const ROADMAP_KEY = 'logr-roadmap'
 const EXTRAS_KEY = 'logr-extras'
 const COVERED_KEY = 'logr-covered'
+const COMPLETIONS_KEY = 'logr-completions'
 
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
@@ -61,6 +62,41 @@ function recordCovered(plan) {
 }
 export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)
+}
+
+// A lasting record of resources the student finished, for the journey view. Kept even if the
+// resource is later removed, so completed work stays celebrated. Cleared only by Start over.
+export function getCompletions() {
+  try { return JSON.parse(localStorage.getItem(COMPLETIONS_KEY)) || [] } catch { return [] }
+}
+export function recordCompletion(name) {
+  const n = String(name || '').trim()
+  if (!n) return
+  const list = getCompletions()
+  if (list.some((c) => c.name.toLowerCase() === n.toLowerCase())) return
+  list.push({ name: n, date: new Date().toDateString() })
+  localStorage.setItem(COMPLETIONS_KEY, JSON.stringify(list))
+}
+export function removeCompletion(name) {
+  const n = String(name || '').trim().toLowerCase()
+  localStorage.setItem(COMPLETIONS_KEY, JSON.stringify(getCompletions().filter((c) => c.name.toLowerCase() !== n)))
+}
+// Keep the ledger in step with the current resources' done state (called when Settings saves).
+// Untouched resources (already removed from the list) keep their completion record.
+export function reconcileCompletions(resources) {
+  ;(resources || []).forEach((r) => {
+    if (!r || !r.name) return
+    if (r.done) recordCompletion(r.name)
+    else removeCompletion(r.name)
+  })
+}
+// Completions dated within the current calendar month, for the journey view.
+export function monthCompletions() {
+  const now = new Date()
+  return getCompletions().filter((c) => {
+    const d = new Date(c.date)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
 }
 
 // Personal one off tasks the student adds for a specific day, on top of the AI plan.
