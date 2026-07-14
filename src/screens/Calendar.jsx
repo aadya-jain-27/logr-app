@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, CalendarDays, Sparkles, CloudOff, RefreshCw, ChevronLeft, ChevronRight, Flag } from 'lucide-react'
-import { getProfile, getValidRoadmap, saveRoadmap, getExtras } from '../data/store'
+import { ArrowLeft, CalendarDays, Sparkles, CloudOff, RefreshCw, ChevronLeft, ChevronRight, Flag, Plus } from 'lucide-react'
+import { getProfile, saveProfile, getValidRoadmap, saveRoadmap, getExtras } from '../data/store'
 import { requestRoadmap } from '../lib/plan'
 
 // Soft, calm palette so each phase reads as its own gentle band across the calendar.
@@ -23,19 +23,20 @@ export default function Calendar() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [selected, setSelected] = useState(null) // a Date the user tapped in month view
 
-  const generate = async () => {
-    if (!profile) return
+  const regenerateWith = async (prof) => {
+    if (!prof) return
     setStatus('loading')
     const r = await requestRoadmap({
-      goal: profile.goal, deadline: profile.deadline,
-      weekdayHours: profile.weekday, weekendHours: profile.weekend, resources: profile.resources,
+      goal: prof.goal, deadline: prof.deadline,
+      weekdayHours: prof.weekday, weekendHours: prof.weekend, resources: prof.resources,
     })
     if (r && Array.isArray(r.phases) && r.phases.length && !r.error) {
-      setRecord(saveRoadmap(profile, r)); setStatus('ready')
+      setRecord(saveRoadmap(prof, r)); setStatus('ready')
     } else {
       setErrKind(r?.error === 'no_key' ? 'no_key' : 'failed'); setStatus('error')
     }
   }
+  const generate = () => regenerateWith(profile)
 
   useEffect(() => {
     if (!profile) return
@@ -62,20 +63,28 @@ export default function Calendar() {
   const extrasOn = (date) => getExtras(date.toDateString())
   // A resource the student paced (e.g. "divide across 2 weeks") shows on every day of its span.
   const scheduledOn = (n) => schedule.filter((s) => s && n >= s.dayStart && n <= s.dayEnd)
-  const scribble = (n, pIdx) => {
+  // Only the resources actually scheduled for a day get a task label. Days inside a phase
+  // with no scheduled resource return '' here and are shown as "part of [phase]" in the
+  // detail, so we never stamp a task-shaped label on a day that has no concrete work yet.
+  const scribble = (n) => {
     const sched = scheduledOn(n)
-    if (sched.length) {
-      return sched.map((s) => {
-        const total = s.dayEnd - s.dayStart + 1
-        return total > 1 ? `${s.resource} (day ${n - s.dayStart + 1} of ${total})` : s.resource
-      }).join(', ')
-    }
-    // On days with no specific resource scheduled, show the phase's theme rather than
-    // recycling resource names day after day (which read as repetition). Your own materials
-    // appear only on their real days above; the rest of a phase shows what it is building.
-    const p = phases[pIdx]
-    if (!p) return ''
-    return p.focus || p.title || ''
+    if (!sched.length) return ''
+    return sched.map((s) => {
+      const total = s.dayEnd - s.dayStart + 1
+      return total > 1 ? `${s.resource} (day ${n - s.dayStart + 1} of ${total})` : s.resource
+    }).join(', ')
+  }
+  // A phase's suggested materials are the named resources it draws on that the student has
+  // not already added. Offered as "Suggested" for one tap adding, never auto scheduled.
+  const ownNames = (profile.resources || []).map((r) => String(r.name || '').toLowerCase()).filter(Boolean)
+  const isOwn = (mat) => { const m = String(mat || '').toLowerCase(); return ownNames.some((n) => m.includes(n) || n.includes(m)) }
+  const suggestedFor = (phase) => [...new Set((phase?.resources || []).filter((mat) => mat && !isOwn(mat)))]
+  const addSuggested = (mat) => {
+    const prof = getProfile()
+    const next = { ...prof, resources: [...(prof.resources || []), { name: mat, hours: '', url: '', notes: '', done: false }] }
+    saveProfile(next)
+    setSelected(null)
+    regenerateWith(next)
   }
 
   const today = new Date()
@@ -151,11 +160,11 @@ export default function Calendar() {
               {view === 'month' ? (
                 <MonthView key={'m' + monthOffset}
                   base={new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)}
-                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected }} />
+                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected, phases, suggestedFor, addSuggested }} />
               ) : (
                 <WeekView key={'w' + weekOffset}
                   weekStart={addDays(addDays(today, -today.getDay()), weekOffset * 7)}
-                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays }} />
+                  {...{ today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, phases }} />
               )}
             </AnimatePresence>
 
@@ -181,7 +190,7 @@ export default function Calendar() {
   )
 }
 
-function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected }) {
+function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, selected, setSelected, phases, suggestedFor, addSuggested }) {
   const year = base.getFullYear(), month = base.getMonth()
   const firstWeekday = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -193,7 +202,8 @@ function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, e
     if (!selected || selected.getMonth() !== month) return null
     const n = dayNumber(selected)
     const pIdx = phaseIndexFor(n)
-    return { n, pIdx, rest: isRest(selected), commits: commitsOn(selected), topic: scribble(n, pIdx), extras: extrasOn(selected) }
+    const phase = pIdx >= 0 ? phases[pIdx] : null
+    return { n, pIdx, phase, rest: isRest(selected), commits: commitsOn(selected), topic: scribble(n), suggested: suggestedFor(phase), extras: extrasOn(selected) }
   })()
 
   return (
@@ -220,7 +230,7 @@ function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, e
           return (
             <button key={i} onClick={() => setSelected(date)}
               className="aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all hover:opacity-80"
-              title={commits.length ? commits.map((c) => `${c.type}: ${c.name}`).join(', ') : (inPlan && !rest ? scribble(n, pIdx) : '')}
+              title={commits.length ? commits.map((c) => `${c.type}: ${c.name}`).join(', ') : (inPlan && !rest ? scribble(n) : '')}
               style={{
                 background: commits.length ? 'color-mix(in srgb, #E5484D 16%, transparent)' : (inPlan && !rest && color ? `${color}33` : 'var(--chip)'),
                 boxShadow: isToday ? '0 0 0 2px var(--primary)' : (isSel ? '0 0 0 2px var(--text-soft)' : 'none'),
@@ -248,8 +258,30 @@ function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, e
             <div className="text-xs text-soft">Outside your current plan.</div>
           ) : selInfo.rest ? (
             <div className="text-xs text-soft">A rest day. Enjoy it.</div>
-          ) : (
+          ) : selInfo.topic ? (
             <div className="text-xs text-soft">Planned: {selInfo.topic}</div>
+          ) : selInfo.phase ? (
+            <div>
+              <div className="text-xs text-soft">Part of {selInfo.phase.title}.</div>
+              <div className="text-xs text-soft mt-0.5" style={{ opacity: 0.8 }}>These days are open. Add materials to make them concrete.</div>
+              {selInfo.suggested.length > 0 && (
+                <div className="mt-2.5 space-y-1.5">
+                  {selInfo.suggested.slice(0, 4).map((mat, mi) => (
+                    <div key={mi} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0" style={{ background: 'var(--panel)', color: 'var(--text-soft)', border: '1px solid var(--panel-border)' }}>Suggested</span>
+                        <span className="text-xs truncate" style={{ color: 'var(--text)' }}>{mat}</span>
+                      </span>
+                      <button onClick={() => addSuggested(mat)} className="text-xs flex items-center gap-1 shrink-0 hover:opacity-75 transition-opacity" style={{ color: 'var(--primary)' }} title={`Add ${mat} to your resources`}>
+                        <Plus size={12} /> Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs text-soft">Part of your plan.</div>
           )}
           {selInfo.extras.length > 0 && (
             <div className="mt-1.5 space-y-1">
@@ -266,7 +298,7 @@ function MonthView({ base, today, dayNumber, phaseIndexFor, isRest, commitsOn, e
   )
 }
 
-function WeekView({ weekStart, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays }) {
+function WeekView({ weekStart, today, dayNumber, phaseIndexFor, isRest, commitsOn, extrasOn, scribble, totalDays, phases }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }} className="space-y-2">
@@ -298,7 +330,9 @@ function WeekView({ weekStart, today, dayNumber, phaseIndexFor, isRest, commitsO
               ) : (
                 <div className="flex items-center gap-2">
                   {color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />}
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{scribble(n, pIdx)}</span>
+                  {scribble(n)
+                    ? <span className="text-sm" style={{ color: 'var(--text)' }}>{scribble(n)}</span>
+                    : <span className="text-sm text-soft">{phases[pIdx] ? `Part of ${phases[pIdx].title}` : 'Part of your plan'}</span>}
                 </div>
               )}
               {extras.map((x, k) => (
