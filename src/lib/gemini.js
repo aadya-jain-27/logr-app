@@ -14,7 +14,7 @@ Today is ${date}, which is ${dayType}.
 Their goal: ${g || 'general study progress'}
 Target timeframe: ${dl || 'no fixed deadline'}
 Time they can give today: about ${minutesToday} minutes total.
-${resources && resources.length ? `They are learning from these specific resources only. Do not invent or suggest other materials. Plan the NEXT chunk of the relevant one(s) for today, progressing from what they have already done. Read the timing note on each resource as ordinary language in the student's own words, not by matching keywords, and honor what it means. If the note implies today or now, include that resource today. If it implies spreading over several days, today gets one fair chunk, not the whole thing. Never plan more than the available minutes today, and if something is longer than today's time, plan as much as fits and say so honestly in acknowledgements. For "source", use a short human-readable name like the resource name or platform. Never put a URL in "source". If a link is provided, reference that specific resource by name in the task title:\n${resources.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ' (length unknown, estimate it)'}${r.url ? ` [${r.url}]` : ''}${r.file ? ` | ${r.file.pageCount ? `${r.file.pageCount} pages, ` : ''}${(r.file.topics || []).length ? `covers: ${(r.file.topics || []).slice(0, 8).join(', ')}` : ''}` : ''}${r.notes ? ` | constraints: ${sanitize(r.notes, 300)}` : ''}`).join('\n')}\n` : ''}${covered && covered.length ? `The student has ALREADY COMPLETED these on earlier days. Do not plan them again, and do not plan trivially reworded versions. Move forward to genuinely new material inside their resources:\n${covered.map((c) => `- ${sanitize(c, 160)}`).join('\n')}\nIf, after skipping everything above, there is no genuinely new material left in their resources, do NOT repeat or repad old work. Instead return an empty "tasks" array and set "caughtUp" to true.\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.map(s => sanitize(s, 100)).join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}${todaysCommitments && todaysCommitments.length ? `Today the student also has these fixed commitments to handle: ${todaysCommitments.map((c) => `${sanitize(c.name, 100)} (${c.type})`).join(', ')}. Their study time today is already reduced to leave room for these. Keep it gentle, and add a short acknowledgement that today is kept lighter because of them.\n` : ''}
+${resources && resources.length ? `They are learning from these specific resources only. Do not invent or suggest other materials. Plan the NEXT chunk of the relevant one(s) for today, progressing from what they have already done. Read the timing note on each resource as ordinary language in the student's own words, not by matching keywords, and honor what it means. If the note implies today or now, include that resource today. If it implies spreading over several days, today gets one fair chunk, not the whole thing. Never plan more than the available minutes today, and if something is longer than today's time, plan as much as fits and say so honestly in acknowledgements. For "source", use a short human-readable name like the resource name or platform. Never put a URL in "source". If a link is provided, reference that specific resource by name in the task title:\n${resources.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ' (length unknown, estimate it)'}${r.scope ? ` | TOTAL SIZE: ${sanitize(r.scope, 80)} (this is the entire resource, nothing exists beyond it)` : ''}${r.url ? ` [${r.url}]` : ''}${r.file ? ` | ${r.file.pageCount ? `${r.file.pageCount} pages, ` : ''}${(r.file.topics || []).length ? `covers: ${(r.file.topics || []).slice(0, 8).join(', ')}` : ''}` : ''}${r.notes ? ` | constraints: ${sanitize(r.notes, 300)}` : ''}`).join('\n')}\n` : ''}${covered && covered.length ? `The student has ALREADY COMPLETED these on earlier days. Do not plan them again, and do not plan trivially reworded versions. Move forward to genuinely new material inside their resources:\n${covered.map((c) => `- ${sanitize(c, 160)}`).join('\n')}\nIf, after skipping everything above, there is no genuinely new material left in their resources, do NOT repeat or repad old work. Instead return an empty "tasks" array and set "caughtUp" to true.\n` : ''}${carriedOver && carriedOver.length ? `From a recent day, these were not finished and may still matter: ${carriedOver.map(s => sanitize(s, 100)).join('; ')}. Fold the still relevant ones into today naturally, and drop anything no longer useful. Never pile up old work; today must still fit within ${minutesToday} minutes.\n` : ''}${daysAway >= 2 ? `The student has been away for ${daysAway} days. Welcome them back gently with a lighter, encouraging plan today. Do not overload. Help them restart, not catch up.\n` : ''}${todaysCommitments && todaysCommitments.length ? `Today the student also has these fixed commitments to handle: ${todaysCommitments.map((c) => `${sanitize(c.name, 100)} (${c.type})`).join(', ')}. Their study time today is already reduced to leave room for these. Keep it gentle, and add a short acknowledgement that today is kept lighter because of them.\n` : ''}
 Rules:
 - Plan ONLY today. Usually 2 to 4 small, specific, doable tasks. The tasks together must fit within ${minutesToday} minutes and must never exceed it.
 - Task minutes must be honest working time for what the task says. Never assign a sliver like 1 to 10 minutes; nobody memorizes or learns anything real in 4 minutes. Every task gets at least 15 minutes, and most should get 25 to 60.
@@ -24,7 +24,7 @@ Rules:
 - Each task is a concrete action (not vague). For "source", use a short human-readable name like the resource name or platform (e.g. "Pandas tutorial", "Coursera", "Chapter 3"). Never put a URL in "source".
 - Every task must be distinct. Never repeat a task or list the same thing twice, and never plan anything the student already completed on an earlier day (listed above).
 - Never invent filler or generic busywork to fill time. It is better to plan fewer real tasks, or none at all with "caughtUp" true, than to repad finished material.
-- Use what you know about each resource's real structure and length. Never plan a week, module, or chapter that does not exist. For example, if a course has only three weeks and the student is on week 3, that is the last week, so do not plan a "week 4"; treat the resource as nearly finished instead.
+- When a resource states its TOTAL SIZE, that is a hard ceiling. NEVER plan anything beyond it, and never invent parts past it (no "module 4" of a 3 module resource, no "week 4" of a 3 week resource). Count what the student has already completed against that total: once they have covered the full stated size, the resource is finished, so plan no more of it and set "caughtUp" to true if nothing else remains. When no total size is given, do not keep incrementing part numbers to fill the plan; if you are unsure more genuinely exists, treat the resource as finished rather than inventing.
 - Keep it gentle and achievable. Never overload an overwhelmed student.
 - Do NOT use em dashes, en dashes, or hyphens between words or numbers. Use commas or periods, and write number ranges with the word "to" (for example, two to three).
 
@@ -36,7 +36,8 @@ Return STRICT JSON in exactly this shape, nothing else:
   "goalProgress": number (0 to 100, your honest estimate),
   "pace": "a short reassuring phrase, e.g. nicely paced",
   "acknowledgements": ["short lines confirming how you honored each pacing constraint from the resource notes, empty array if none"],
-  "caughtUp": boolean (true ONLY when there is nothing genuinely new left in their resources to plan, in which case "tasks" MUST be empty; otherwise false)
+  "caughtUp": boolean (true ONLY when there is nothing genuinely new left in their resources to plan, in which case "tasks" MUST be empty; otherwise false),
+  "resourceProgress": [ { "name": "a resource name exactly as it was given", "percent": number (0 to 100: of the resource's total size, what fraction is ALREADY finished based ONLY on the completed items listed above, NOT counting today's plan. If its total size is "3 modules" and one is done, that is about 33) } ]
 }
 
 For "acknowledgements": read the notes on each resource. If a note contains a pacing request (a deadline, "finish today", "divide across N days", "cover chapters X to Y"), add ONE short, warm line confirming how today's plan honors it, for example "Covering the DSA sheet over 3 days, as you asked." or "Finishing the pandas video today." Write ranges with the word "to" and use no dashes. If there are no such requests, return an empty array.
@@ -53,7 +54,7 @@ export function buildRoadmapPrompt({ goal, deadline, weekdayHours, weekendHours,
 Their goal: ${g || 'general study progress'}
 Target timeframe: ${dl || 'no fixed deadline, so choose a sensible one and say so'}
 Time they can usually give: about ${weekdayHours ?? 2} hours on weekdays and ${weekendHours ?? 3} hours on weekends.
-${res.length ? `The student is currently working from these resources. Anchor the path in them and place each where it truly belongs. Honor any timing note exactly: if a note says finish today, this week, or by a date, schedule that resource at the very start, never late:\n${res.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ''}${r.file?.pageCount ? ` (${r.file.pageCount} pages)` : ''}${r.file?.topics?.length ? `, topics: ${r.file.topics.slice(0, 8).join(', ')}` : ''}${r.notes ? ` | the student said: ${sanitize(r.notes, 200)}` : ''}`).join('\n')}\n` : 'The student has not listed resources yet.\n'}
+${res.length ? `The student is currently working from these resources. Anchor the path in them and place each where it truly belongs. Honor any timing note exactly: if a note says finish today, this week, or by a date, schedule that resource at the very start, never late:\n${res.map((r) => `- ${sanitize(r.name, 200)}${r.hours ? ` (about ${r.hours})` : ''}${r.scope ? ` | total size: ${sanitize(r.scope, 80)}, and nothing exists beyond it` : ''}${r.file?.pageCount ? ` (${r.file.pageCount} pages)` : ''}${r.file?.topics?.length ? `, topics: ${r.file.topics.slice(0, 8).join(', ')}` : ''}${r.notes ? ` | the student said: ${sanitize(r.notes, 200)}` : ''}`).join('\n')}\nWhere a resource states a total size, treat that as its exact extent: never schedule or suggest parts beyond it (no week 4 of a 3 week course).\n` : 'The student has not listed resources yet.\n'}
 Work out what this specific goal genuinely requires from start to finish, then lay it across the timeframe. Where the student's own resources cover a part, use them there. Where the goal needs more than they listed, add specific, mostly free, well known materials BY NAME (real courses, books, sites), never vague advice. Front load what the student is doing right now and anything they marked urgent.
 
 Use what you genuinely know about each named resource's real structure and length. Never invent weeks, modules, chapters, or parts that do not exist. If the student lists a specific part of a course, work out from what you know whether more of that course remains. For example, Andrew Ng's Machine Learning Course 1 has only three weeks, so a student on "week 3" is on the LAST week: treat that course as essentially finished and do NOT suggest nonexistent "remaining weeks". Only continue a course as far as it genuinely goes, and do not re-list a resource the student already named as if it were a new suggestion.
@@ -219,6 +220,7 @@ async function youTubePageInfo(url) {
 // YouTube links are supported, so a non YouTube link returns an error rather than a guess.
 export async function parseUrl(key, url, hint) {
   const id = youTubeId(url)
+  if (!id && String(url || '').trim()) return scanCourse(key, url) // non YouTube link: best effort scope scan
   let info = null
   if (hint && Number(hint.seconds) > 0) {
     info = { title: String(hint.title || ''), secs: Number(hint.seconds), desc: '' }
@@ -231,4 +233,31 @@ export async function parseUrl(key, url, hint) {
   let topics = []
   try { topics = await topicsFromText(key, info.title, info.desc.slice(0, 800)) } catch { /* topics are optional */ }
   return { title: info.title, hours: formatLength(info.secs), topics, summary: info.desc.slice(0, 300) }
+}
+
+// Best effort: fetch a course or reading page and pull out its title and total size (weeks,
+// lectures, pages). Many course sites render with JavaScript and expose little to a plain
+// fetch, so this often finds nothing; it returns an empty scope rather than guessing, and
+// the student can always type the size themselves.
+async function scanCourse(key, url) {
+  let text = ''
+  try {
+    const page = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9' },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (page.ok) {
+      const html = await page.text()
+      const title = decodeEntities((html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || '')
+      const desc = decodeEntities((html.match(/<meta property="og:description" content="([^"]*)"/) || [])[1] || '')
+      const body = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')
+      text = `${title}. ${desc}. ${body}`.replace(/\s+/g, ' ').trim().slice(0, 12000)
+    }
+  } catch { /* page could not be read */ }
+  if (text.replace(/\s/g, '').length < 80) return { error: 'unreadable' }
+  const prompt = `Below is text from a course or learning resource web page. Return STRICT JSON: { "title": string, "scope": string }. "scope" is the resource's TOTAL size as a short countable phrase such as "12 lectures", "6 weeks", "40 videos", or "320 pages", taken ONLY from what the page clearly states. If the page does not clearly state a total size, set "scope" to an empty string. Never guess or invent a number. Do not use dashes.\n\nTEXT:\n${text}`
+  try {
+    const out = await runWithFallback(key, prompt, 0.2)
+    return { title: String(out.title || ''), scope: String(out.scope || ''), kind: 'course' }
+  } catch { return { error: 'unreadable' } }
 }

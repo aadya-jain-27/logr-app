@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Check, Trash2, BookOpen, Link as LinkIcon, Plus, Bell, Paperclip, Loader, Pencil, X } from 'lucide-react'
-import { getProfile, saveProfile, reconcileCompletions } from '../data/store'
+import { getProfile, saveProfile, reconcileCompletions, getResourceProgress } from '../data/store'
+
+// A gentle word for how far along a resource is, from its rough percent.
+const progressWord = (p) => p >= 90 ? 'nearly done' : p >= 55 ? 'over halfway' : p >= 30 ? 'well underway' : p >= 10 ? 'getting going' : 'just started'
 import { useScene } from '../theme'
 import { SCENES } from '../scenes/scenes'
 import { requestPermission, scheduleDaily } from '../lib/notify'
@@ -27,9 +30,9 @@ export default function Settings() {
     commitments: raw?.commitments || [],
   })
 
-  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', file: null })
+  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', scope: '', file: null })
   const [editIdx, setEditIdx] = useState(null)
-  const [edit, setEdit] = useState({ name: '', hours: '', url: '', notes: '' })
+  const [edit, setEdit] = useState({ name: '', hours: '', url: '', notes: '', scope: '' })
   const [fileLoading, setFileLoading] = useState(false)
   const [fileErr, setFileErr] = useState('')
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
@@ -38,11 +41,12 @@ export default function Settings() {
   const [confirmReset, setConfirmReset] = useState(false)
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const progress = getResourceProgress()
 
   const addResource = () => {
     if (!nr.name.trim()) return
     set('resources', [...form.resources, { ...nr, done: false }])
-    setNr({ name: '', hours: '', url: '', notes: '', file: null })
+    setNr({ name: '', hours: '', url: '', notes: '', scope: '', file: null })
     setFileErr('')
   }
   const handleFileUpload = async (e) => {
@@ -57,7 +61,7 @@ export default function Settings() {
       const res = await fetch('/api/parse-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extracted) })
       const data = await res.json()
       if (!data.error) {
-        setNr((prev) => ({ ...prev, name: prev.name || data.title || f.name, hours: prev.hours || (data.pageCount ? String(Math.round(data.pageCount / 15)) : ''), notes: prev.notes || (data.summary || ''), file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary } }))
+        setNr((prev) => ({ ...prev, name: prev.name || data.title || f.name, hours: prev.hours || (data.pageCount ? String(Math.round(data.pageCount / 15)) : ''), scope: prev.scope || (data.pageCount ? `${data.pageCount} pages` : ''), notes: prev.notes || (data.summary || ''), file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary } }))
       } else { setFileErr('Could not read that file. You can type the details instead.') }
     } catch { setFileErr('Could not read that file. You can type the details instead.') } finally { setFileLoading(false) }
     e.target.value = ''
@@ -71,13 +75,13 @@ export default function Settings() {
   const startEdit = (i) => {
     const r = form.resources[i]
     setEditIdx(i)
-    setEdit({ name: r.name || '', hours: r.hours || '', url: r.url || '', notes: r.notes || '' })
+    setEdit({ name: r.name || '', hours: r.hours || '', url: r.url || '', notes: r.notes || '', scope: r.scope || '' })
   }
-  const cancelEdit = () => { setEditIdx(null); setEdit({ name: '', hours: '', url: '', notes: '' }) }
+  const cancelEdit = () => { setEditIdx(null); setEdit({ name: '', hours: '', url: '', notes: '', scope: '' }) }
   const saveEdit = () => {
     if (!edit.name.trim()) return
     set('resources', form.resources.map((r, idx) => (idx === editIdx
-      ? { ...r, name: edit.name.trim(), hours: edit.hours.trim(), url: edit.url.trim(), notes: edit.notes.trim() }
+      ? { ...r, name: edit.name.trim(), hours: edit.hours.trim(), url: edit.url.trim(), notes: edit.notes.trim(), scope: edit.scope.trim() }
       : r)))
     cancelEdit()
   }
@@ -207,6 +211,9 @@ export default function Settings() {
                       <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course)"
                         style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
                         value={edit.url} onChange={(e) => setEdit({ ...edit, url: e.target.value })} />
+                      <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="How much is it in total? e.g. 12 lectures, 200 pages (optional)"
+                        style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
+                        value={edit.scope} onChange={(e) => setEdit({ ...edit, scope: e.target.value })} />
                       <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
                         placeholder="Constraints, e.g. finish today, divide across 3 days (optional)"
                         style={{ color: 'var(--text)' }} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
@@ -244,7 +251,16 @@ export default function Settings() {
                           </a>
                         )}
                       </div>
+                      {r.scope && <div className="text-xs text-soft mt-0.5 truncate">of {r.scope}</div>}
                       {r.notes && <div className="text-xs text-soft mt-0.5 truncate">{r.notes}</div>}
+                      {!r.done && progress[r.name] != null && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--panel-border)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${progress[r.name]}%`, background: 'var(--primary)' }} />
+                          </div>
+                          <span className="text-[10px] text-soft shrink-0">{progressWord(progress[r.name])}</span>
+                        </div>
+                      )}
                     </div>
                     <button onClick={() => startEdit(i)} className="shrink-0 hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }} title="Edit">
                       <Pencil size={13} />
@@ -286,6 +302,9 @@ export default function Settings() {
               <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="Link (YouTube or course, optional)"
                 style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
                 value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setFileErr('') }} />
+              <input className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent" placeholder="How much is it in total? e.g. 12 lectures, 3 modules, 200 pages (optional)"
+                style={{ color: 'var(--text)', borderBottom: '1px solid var(--panel-border)' }}
+                value={nr.scope} onChange={(e) => setNr({ ...nr, scope: e.target.value })} />
               <textarea className="w-full px-3.5 py-2.5 text-sm outline-none bg-transparent resize-none" rows={2}
                 placeholder="Constraints, e.g. finish today, divide across 3 days (optional)"
                 style={{ color: 'var(--text)' }}

@@ -39,7 +39,7 @@ export default function Onboarding() {
     commitments: [], skipWeekends: false, resources: [],
   })
   const [nc, setNc] = useState({ name: '', date: '', type: 'Exam' })
-  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', file: null })
+  const [nr, setNr] = useState({ name: '', hours: '', url: '', notes: '', scope: '', file: null })
   const [fileLoading, setFileLoading] = useState(false)
   const [urlLoading, setUrlLoading] = useState(false)
   const [urlErr, setUrlErr] = useState(false)
@@ -58,8 +58,8 @@ export default function Onboarding() {
   }
   const addResource = () => {
     if (!nr.name.trim()) return
-    set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim() || nr.file?.url || '', notes: nr.notes.trim(), file: nr.file }] })
-    setNr({ name: '', hours: '', url: '', notes: '', file: null })
+    set({ resources: [...p.resources, { name: nr.name.trim(), hours: nr.hours.trim(), url: nr.url.trim() || nr.file?.url || '', notes: nr.notes.trim(), scope: nr.scope.trim(), file: nr.file }] })
+    setNr({ name: '', hours: '', url: '', notes: '', scope: '', file: null })
     setUrlErr(false)
     setFileErr('')
   }
@@ -84,6 +84,7 @@ export default function Onboarding() {
           ...prev,
           name: prev.name || data.title || f.name,
           hours: prev.hours || (data.pageCount ? String(Math.round(data.pageCount / 15)) : ''),
+          scope: prev.scope || (data.pageCount ? `${data.pageCount} pages` : ''),
           notes: prev.notes || (data.summary ? data.summary : ''),
           file: { name: f.name, pageCount: data.pageCount, topics: data.topics, summary: data.summary },
         }))
@@ -106,7 +107,13 @@ export default function Onboarding() {
       const meta = await getYouTubeMeta(url)
       const res = await fetch('/api/parse-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, title: meta?.title, seconds: meta?.seconds }), signal: ctrl.signal })
       const data = await res.json()
-      if (!data.error && (data.hours || data.title || (data.topics && data.topics.length))) {
+      if (data.kind === 'course') {
+        // A non YouTube course link: fill in what the page revealed, and keep the link itself.
+        if (!data.error && (data.title || data.scope)) {
+          setNr((prev) => (prev.url.trim() !== url ? prev : { ...prev, name: prev.name || data.title || '', scope: prev.scope || data.scope || '' }))
+          if (!data.scope) setUrlErr(true) // read the page but could not find a size
+        } else { setUrlErr(true) }
+      } else if (!data.error && (data.hours || data.title || (data.topics && data.topics.length))) {
         setNr((prev) => {
           // If the entry was cleared or changed while we were reading, don't clobber the new one.
           if (prev.url.trim() !== url) return prev
@@ -114,6 +121,7 @@ export default function Onboarding() {
             ...prev,
             name: prev.name || data.title || '',
             hours: prev.hours || (data.hours ? String(data.hours) : ''),
+            scope: prev.scope || (data.hours ? `${data.hours} video` : ''),
             url: '', // link is captured below; clear the bar so it reads fresh
             file: { name: data.title || 'YouTube video', url, topics: data.topics || [], summary: data.summary || '', kind: 'video' },
           }
@@ -289,25 +297,26 @@ export default function Onboarding() {
                   )}
                   <div className="flex items-center" style={{ borderTop: '1px solid var(--panel-border)' }}>
                     <input className="flex-1 px-3 py-2 text-sm outline-none bg-transparent" style={{ color: 'var(--text)', opacity: 0.8 }} placeholder="YouTube or course link (optional)" value={nr.url} onChange={(e) => { setNr({ ...nr, url: e.target.value }); setUrlErr(false); setFileErr('') }} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
-                    {isYouTube(nr.url) && (
-                      <button onClick={analyzeUrl} disabled={urlLoading} title="Let Logr watch this video to find its length and topics"
+                    {nr.url.trim() && (
+                      <button onClick={analyzeUrl} disabled={urlLoading} title="Read this link to find its length or total size"
                         className="shrink-0 mr-2 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-opacity hover:opacity-80"
                         style={{ background: 'var(--chip)', color: 'var(--primary)', border: '1px solid var(--panel-border)' }}>
                         {urlLoading ? <Loader size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                        {urlLoading ? 'Reading' : 'Detect length'}
+                        {urlLoading ? 'Reading' : (isYouTube(nr.url) ? 'Detect length' : 'Scan')}
                       </button>
                     )}
                   </div>
                   {urlLoading && (
                     <div className="px-3 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>
-                      Watching the video to find its length and topics, this can take a moment.
+                      Reading the link to find its length or size, this can take a moment.
                     </div>
                   )}
                   {urlErr && (
                     <div className="px-3 py-1.5 text-xs" style={{ borderTop: '1px solid var(--panel-border)', color: 'var(--text-soft)' }}>
-                      Couldn't read that link just now. You can still type the hours yourself.
+                      Couldn't find the size from that link. You can type it below.
                     </div>
                   )}
+                  <input className="w-full px-3 py-2 text-sm outline-none bg-transparent" style={{ color: 'var(--text)', borderTop: '1px solid var(--panel-border)', opacity: 0.85 }} placeholder="How much is it in total? e.g. 12 lectures, 3 modules, 200 pages (optional)" value={nr.scope} onChange={(e) => setNr({ ...nr, scope: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addResource()} />
                   <textarea className="w-full px-3 py-2 text-sm outline-none bg-transparent resize-none" rows={2} style={{ color: 'var(--text)', borderTop: '1px solid var(--panel-border)', opacity: 0.8 }} placeholder="Constraints, e.g. finish today, divide across 3 days, cover chapters 2 to 5 (optional)" value={nr.notes} onChange={(e) => setNr({ ...nr, notes: e.target.value })} />
                 </div>
               </div>

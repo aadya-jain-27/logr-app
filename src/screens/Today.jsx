@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
-import { getProfile, saveProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered, recordCompletion } from '../data/store'
+import { getProfile, saveProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered, recordCompletion, saveResourceProgress } from '../data/store'
 import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
 import { useFocus } from '../focus'
 
@@ -88,6 +88,7 @@ export default function Today() {
     if (plan && !plan.error && Array.isArray(plan.tasks) && plan.tasks.length) {
       const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null, acknowledgements: Array.isArray(plan.acknowledgements) ? plan.acknowledgements : [] }
       savePlan(stored)
+      saveResourceProgress(plan.resourceProgress)
       setCaughtUp(false)
       setTasks(stored.tasks)
       setMeta({ goalProgress: stored.goalProgress, pace: stored.pace, acknowledgements: stored.acknowledgements })

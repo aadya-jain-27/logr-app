@@ -6,6 +6,7 @@ const ROADMAP_KEY = 'logr-roadmap'
 const EXTRAS_KEY = 'logr-extras'
 const COVERED_KEY = 'logr-covered'
 const COMPLETIONS_KEY = 'logr-completions'
+const PROGRESS_KEY = 'logr-progress'
 
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
@@ -21,7 +22,7 @@ export function isOnboarded() {
 // A plan is valid only for the day it was made AND the goal/resources/time it was made for.
 // Without the signature, changing your goal mid day would keep serving the old plan.
 function resourcesSig(resources) {
-  return (resources || []).map((r) => `${r.name}~${r.hours || ''}~${r.notes || ''}~${r.done ? 'd' : ''}`).join('|')
+  return (resources || []).map((r) => `${r.name}~${r.hours || ''}~${r.notes || ''}~${r.scope || ''}~${r.done ? 'd' : ''}`).join('|')
 }
 function planSignature(p) {
   const today = new Date().toDateString()
@@ -62,6 +63,22 @@ function recordCovered(plan) {
 }
 export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)
+}
+
+// Rough per-resource progress (0 to 100), the planner's honest estimate from scope and
+// covered work. Keyed by resource name, used for the little progress bar in Settings.
+export function getResourceProgress() {
+  try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {} } catch { return {} }
+}
+export function saveResourceProgress(entries) {
+  if (!Array.isArray(entries) || !entries.length) return
+  const map = getResourceProgress()
+  entries.forEach((e) => {
+    const name = String(e?.name || '').trim()
+    const pct = Math.max(0, Math.min(100, Math.round(Number(e?.percent))))
+    if (name && Number.isFinite(pct)) map[name] = pct
+  })
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(map))
 }
 
 // A lasting record of resources the student finished, for the journey view. Kept even if the
