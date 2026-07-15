@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Clock, Sparkles, Timer, RefreshCw, Coffee, CloudOff, Heart, Settings, AlertTriangle, ChevronDown, Share2, Compass, Plus, X } from 'lucide-react'
-import { getProfile, saveProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered, recordCompletion, saveResourceProgress } from '../data/store'
+import { getProfile, saveProfile, getCachedPlan, getRawPlan, savePlan, clearPlan, getYesterdayPlan, getValidRoadmap, saveRoadmap, pathDay, getExtras, addExtra, saveExtras, getCovered, recordCompletion, saveResourceProgress, clearProgressData } from '../data/store'
 import { requestPlan, requestRoadmap, todayCapacity } from '../lib/plan'
 import { useFocus } from '../focus'
 
@@ -175,6 +175,15 @@ export default function Today() {
     generate()
   }
 
+  // "I'm not actually done": clear the covered ledger and progress (which may be stale from
+  // earlier sessions) and plan fresh on the current resources.
+  const keepPlanning = () => {
+    clearProgressData()
+    clearPlan()
+    setJustLogged([])
+    generate()
+  }
+
   // When you're caught up, mark the finished resources complete so they log to your journey.
   const markMaterialsComplete = () => {
     const prof = getProfile()
@@ -305,6 +314,9 @@ export default function Today() {
                     <p className="text-soft text-sm mb-2.5 max-w-xs mx-auto">Finished {activeResources.map((r) => r.name).join(', ')}? Log it so it shows in your journey.</p>
                     <button onClick={markMaterialsComplete} className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-full transition-opacity hover:opacity-80" style={{ background: 'var(--chip)', border: '1px solid var(--panel-border)', color: 'var(--primary)' }}>
                       <Check size={14} /> Mark complete
+                    </button>
+                    <button onClick={keepPlanning} className="block mx-auto mt-2.5 text-xs underline hover:opacity-75 transition-opacity" style={{ color: 'var(--text-soft)' }}>
+                      Not done yet? Keep planning these
                     </button>
                   </div>
                 ) : justLogged.length > 0 ? (

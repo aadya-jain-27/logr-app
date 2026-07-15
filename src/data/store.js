@@ -12,8 +12,11 @@ export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
 }
 export function saveProfile(p) {
+  const prev = getProfile()
   localStorage.setItem(KEY, JSON.stringify(p))
   localStorage.setItem('logr-onboarded', '1')
+  // A brand new goal is a fresh journey: don't let old covered work mark it as already done.
+  if (prev && (prev.goal || '') !== (p?.goal || '')) clearProgressData()
 }
 export function isOnboarded() {
   return localStorage.getItem('logr-onboarded') === '1'
@@ -63,6 +66,13 @@ function recordCovered(plan) {
 }
 export function clearPlan() {
   localStorage.removeItem(PLAN_KEY)
+}
+// Wipe the "already covered" ledger and per-resource progress. Used when the student says
+// they are not actually finished (recovering from a wrong caught-up), so the planner starts
+// fresh on their current resources.
+export function clearProgressData() {
+  localStorage.removeItem(COVERED_KEY)
+  localStorage.removeItem(PROGRESS_KEY)
 }
 
 // Rough per-resource progress (0 to 100), the planner's honest estimate from scope and
