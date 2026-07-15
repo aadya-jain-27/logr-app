@@ -15,6 +15,6 @@
 
 - React 19, Vite, React Router, Tailwind CSS v4, Framer Motion
 - Google Gemini API, called **only server side**
-- Serverless API routes (`api/*`) in production; a Vite dev middleware mirrors them locally
+- Serverless API routes in production; a Vite dev middleware mirrors them locally
 - Browser storage for your profile, plan, and progress (privacy first, no account needed)
 
