@@ -11,12 +11,19 @@ const PROGRESS_KEY = 'logr-progress'
 export function getProfile() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null } catch { return null }
 }
+// The content of a resource, ignoring its done flag, so we can tell a real edit (new link,
+// hours, name, scope) from just ticking it complete.
+function resourceContentSig(resources) {
+  return (resources || []).map((r) => `${r.name || ''}~${r.hours || ''}~${r.url || ''}~${r.notes || ''}~${r.scope || ''}`).join('|')
+}
 export function saveProfile(p) {
   const prev = getProfile()
+  // Changing the goal or editing the materials themselves is a fresh assessment: clear the
+  // old covered ledger and progress so stale history cannot wrongly mark the plan as done.
+  const changed = prev && ((prev.goal || '') !== (p?.goal || '') || resourceContentSig(prev.resources) !== resourceContentSig(p?.resources))
   localStorage.setItem(KEY, JSON.stringify(p))
   localStorage.setItem('logr-onboarded', '1')
-  // A brand new goal is a fresh journey: don't let old covered work mark it as already done.
-  if (prev && (prev.goal || '') !== (p?.goal || '')) clearProgressData()
+  if (changed) clearProgressData()
 }
 export function isOnboarded() {
   return localStorage.getItem('logr-onboarded') === '1'
