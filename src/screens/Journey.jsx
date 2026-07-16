@@ -12,6 +12,18 @@ function intensity(minutes) {
   return 0.35
 }
 
+// Combined effort for a day: completed task time plus focused study time.
+const dmin = (v) => (v?.minutes || 0) + (v?.focus || 0)
+// Whether the student showed up that day (finished a task or focused), not just opened a plan.
+const showed = (v) => !!v && ((v.done || 0) > 0 || (v.focus || 0) > 0)
+const daySummary = (v) => {
+  if (!showed(v)) return ''
+  const parts = []
+  if (v.done) parts.push(`${v.done} ${v.done === 1 ? 'task' : 'tasks'} done`)
+  if (v.focus) parts.push(`${v.focus} min focused`)
+  return parts.join(', ')
+}
+
 function weekStats() {
   const history = getHistory()
   const days = []
@@ -64,8 +76,8 @@ export default function Journey() {
         </h1>
         <p className="text-soft text-[15px] mb-7">
           {activeDays === 0
-            ? 'Finish even one thing today, and it will show up here. Something done always beats never starting.'
-            : `Every filled day is something you actually did. That is real progress, ${monthName} is adding up.`}
+            ? 'Finish a task or spend focused time, and the day shows up here. Showing up always beats never starting.'
+            : `Every filled day is a day you showed up, whether you finished a task or just focused. That is real progress, ${monthName} is adding up.`}
         </p>
 
         {/* Stats */}
@@ -107,12 +119,12 @@ export default function Journey() {
                   return (
                     <div key={i} className="aspect-square rounded-xl flex items-center justify-center text-xs transition-all"
                       style={{
-                        background: v ? `color-mix(in srgb, var(--primary) ${intensity(v.minutes) * 100}%, transparent)` : 'var(--chip)',
-                        color: v && intensity(v.minutes) > 0.5 ? 'var(--on-primary)' : 'var(--text-soft)',
+                        background: v ? `color-mix(in srgb, var(--primary) ${intensity(v.mins) * 100}%, transparent)` : 'var(--chip)',
+                        color: v && intensity(v.mins) > 0.5 ? 'var(--on-primary)' : 'var(--text-soft)',
                         boxShadow: isToday ? '0 0 0 2px var(--primary)' : 'none',
                         fontWeight: v ? 600 : 400,
                       }}
-                      title={v ? `${v.done} done, ${v.minutes} min` : ''}
+                      title={daySummary(v)}
                     >
                       {d}
                     </div>
@@ -126,7 +138,8 @@ export default function Journey() {
                 {weekDays.map(({ date, v, isToday }) => {
                   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
                   const dateNum = date.getDate()
-                  const pct = v ? Math.min(100, Math.round((v.minutes / 120) * 100)) : 0
+                  const active = showed(v)
+                  const pct = active ? Math.min(100, Math.round((dmin(v) / 120) * 100)) : 0
                   return (
                     <div key={date.toDateString()} className="flex items-center gap-3">
                       <div className="w-14 shrink-0 text-right">
@@ -136,17 +149,16 @@ export default function Journey() {
                       <div className="flex-1 h-8 rounded-xl overflow-hidden relative" style={{ background: 'var(--chip)' }}>
                         <div className="absolute inset-y-0 left-0 rounded-xl transition-all"
                           style={{ width: `${pct}%`, background: `color-mix(in srgb, var(--primary) 70%, transparent)`, minWidth: pct > 0 ? '8px' : '0' }} />
-                        {v && (
+                        {active ? (
                           <div className="absolute inset-0 flex items-center px-3 gap-2">
                             <span className="text-xs font-medium z-10" style={{ color: pct > 40 ? 'var(--on-primary)' : 'var(--text)' }}>
-                              {v.done} {v.done === 1 ? 'task' : 'tasks'}
+                              {v.done ? `${v.done} ${v.done === 1 ? 'task' : 'tasks'}` : 'focused'}
                             </span>
                             <span className="text-xs z-10" style={{ color: pct > 40 ? 'var(--on-primary)' : 'var(--text-soft)', opacity: 0.8 }}>
-                              {Math.round(v.minutes / 6) / 10}h
+                              {Math.round(dmin(v) / 6) / 10}h
                             </span>
                           </div>
-                        )}
-                        {!v && (
+                        ) : (
                           <div className="absolute inset-0 flex items-center px-3">
                             <span className="text-xs text-soft">{isToday ? 'today' : 'rest'}</span>
                           </div>

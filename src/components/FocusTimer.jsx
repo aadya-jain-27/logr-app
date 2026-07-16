@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Pause, RotateCcw, X, Coffee, Brain, Check } from 'lucide-react'
 import { useFocus } from '../focus'
+import { logFocus } from '../data/store'
 
 const PRESETS = [{ f: 25, b: 5, label: '25 / 5' }, { f: 50, b: 10, label: '50 / 10' }]
 
@@ -52,7 +53,7 @@ export default function FocusTimer() {
       const remaining = Math.max(0, Math.round((endRef.current - Date.now()) / 1000))
       if (remaining <= 0) {
         playChime()
-        if (mode === 'focus') { setCycles((c) => c + 1); endRef.current = Date.now() + activeDurations.b * 60 * 1000; setMode('break'); setSecs(activeDurations.b * 60) }
+        if (mode === 'focus') { logFocus(activeDurations.f); setCycles((c) => c + 1); endRef.current = Date.now() + activeDurations.b * 60 * 1000; setMode('break'); setSecs(activeDurations.b * 60) }
         else { endRef.current = Date.now() + activeDurations.f * 60 * 1000; setMode('focus'); setSecs(activeDurations.f * 60) }
       } else {
         setSecs(remaining)

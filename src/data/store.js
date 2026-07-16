@@ -247,13 +247,31 @@ export function getHistory() {
 function logProgress(plan) {
   const h = getHistory()
   const tasks = plan?.tasks || []
-  h[new Date().toDateString()] = {
+  const t = new Date().toDateString()
+  // Merge, so a focus session already logged today is not wiped when the plan re-saves.
+  h[t] = {
+    ...(h[t] || {}),
     done: tasks.filter((t) => t.done).length,
     total: tasks.length,
     minutes: tasks.filter((t) => t.done).reduce((s, t) => s + (t.minutes || 0), 0),
   }
   localStorage.setItem(HISTORY_KEY, JSON.stringify(h))
 }
+// Focused study time counts as showing up, even on a day nothing was checked off.
+export function logFocus(minutes) {
+  const m = Math.round(Number(minutes) || 0)
+  if (m <= 0) return
+  const h = getHistory()
+  const t = new Date().toDateString()
+  const cur = h[t] || {}
+  h[t] = { ...cur, focus: (cur.focus || 0) + m }
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h))
+}
+
+// Total effort for a day: completed task time plus focused study time.
+const dayMinutes = (v) => (v?.minutes || 0) + (v?.focus || 0)
+// A day counts as showing up if you finished a task OR spent focused time.
+const showedUp = (v) => (v?.done || 0) > 0 || (v?.focus || 0) > 0
 
 // Aggregate this calendar month. Only ever celebrates activity, never marks absence.
 export function monthStats() {
@@ -261,14 +279,14 @@ export function monthStats() {
   const now = new Date()
   const year = now.getFullYear(), month = now.getMonth()
   let tasksDone = 0, minutes = 0, activeDays = 0
-  const days = {} // dayOfMonth -> { done, minutes }
+  const days = {} // dayOfMonth -> history entry, with combined mins
   for (const [dateStr, v] of Object.entries(h)) {
     const d = new Date(dateStr)
-    if (d.getFullYear() === year && d.getMonth() === month && v.done > 0) {
-      tasksDone += v.done
-      minutes += v.minutes
+    if (d.getFullYear() === year && d.getMonth() === month && showedUp(v)) {
+      tasksDone += v.done || 0
+      minutes += dayMinutes(v)
       activeDays += 1
-      days[d.getDate()] = v
+      days[d.getDate()] = { ...v, mins: dayMinutes(v) }
     }
   }
   return { tasksDone, minutes, activeDays, days, year, month }
