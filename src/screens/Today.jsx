@@ -83,7 +83,11 @@ export default function Today() {
       goal: profile.goal, deadline: profile.deadline, minutesToday,
       dayType: cap.dayType, resources: profile.resources, carriedOver, daysAway, todaysCommitments,
       covered: getCovered(),
-      date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+      date: (() => {
+        const n = new Date()
+        const dmy = `${String(n.getDate()).padStart(2, '0')}/${String(n.getMonth() + 1).padStart(2, '0')}/${n.getFullYear()}`
+        return `${n.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} (${dmy})`
+      })(),
     })
     if (plan && !plan.error && Array.isArray(plan.tasks) && plan.tasks.length) {
       const stored = { tasks: withIds(plan.tasks), goalProgress: plan.goalProgress ?? null, pace: plan.pace || null, acknowledgements: Array.isArray(plan.acknowledgements) ? plan.acknowledgements : [] }
