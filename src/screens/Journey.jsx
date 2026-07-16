@@ -148,13 +148,13 @@ export default function Journey() {
                       </div>
                       <div className="flex-1 h-8 rounded-xl overflow-hidden relative" style={{ background: 'var(--chip)' }}>
                         <div className="absolute inset-y-0 left-0 rounded-xl transition-all"
-                          style={{ width: `${pct}%`, background: `color-mix(in srgb, var(--primary) 70%, transparent)`, minWidth: pct > 0 ? '8px' : '0' }} />
+                          style={{ width: `${pct}%`, background: `color-mix(in srgb, var(--primary) 70%, transparent)`, minWidth: active ? '140px' : '0' }} />
                         {active ? (
                           <div className="absolute inset-0 flex items-center px-3 gap-2">
-                            <span className="text-xs font-medium z-10" style={{ color: pct > 40 ? 'var(--on-primary)' : 'var(--text)' }}>
+                            <span className="text-xs font-medium z-10" style={{ color: 'var(--on-primary)' }}>
                               {v.done ? `${v.done} ${v.done === 1 ? 'task' : 'tasks'}` : 'focused'}
                             </span>
-                            <span className="text-xs z-10" style={{ color: pct > 40 ? 'var(--on-primary)' : 'var(--text-soft)', opacity: 0.8 }}>
+                            <span className="text-xs z-10" style={{ color: 'var(--on-primary)', opacity: 0.8 }}>
                               {Math.round(dmin(v) / 6) / 10}h
                             </span>
                           </div>
