@@ -35,6 +35,7 @@ export default function FocusTimer() {
   const [cycles, setCycles] = useState(0)
   const tick = useRef()
   const endRef = useRef(0) // timestamp when the current phase ends
+  const focusStart = useRef(0) // timestamp the current focus run began, flushed as minutes when it stops
 
   const activeDurations = preset === -1
     ? { f: Math.max(1, parseInt(custom.f) || 25), b: Math.max(1, parseInt(custom.b) || 5) }
@@ -53,7 +54,7 @@ export default function FocusTimer() {
       const remaining = Math.max(0, Math.round((endRef.current - Date.now()) / 1000))
       if (remaining <= 0) {
         playChime()
-        if (mode === 'focus') { logFocus(activeDurations.f); setCycles((c) => c + 1); endRef.current = Date.now() + activeDurations.b * 60 * 1000; setMode('break'); setSecs(activeDurations.b * 60) }
+        if (mode === 'focus') { setCycles((c) => c + 1); endRef.current = Date.now() + activeDurations.b * 60 * 1000; setMode('break'); setSecs(activeDurations.b * 60) }
         else { endRef.current = Date.now() + activeDurations.f * 60 * 1000; setMode('focus'); setSecs(activeDurations.f * 60) }
       } else {
         setSecs(remaining)
@@ -66,6 +67,21 @@ export default function FocusTimer() {
     // activeDurations is derived from preset and custom, which are already dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, mode, preset, custom])
+
+  // Log focused time as it is actually spent: a run starts whenever focus is running, and when
+  // that run ends (pause, reset, close, or the phase completing) the minutes elapsed are recorded.
+  // This counts partial sessions, not only full ones.
+  useEffect(() => {
+    if (running && mode === 'focus') {
+      focusStart.current = Date.now()
+      return () => {
+        if (focusStart.current) {
+          logFocus((Date.now() - focusStart.current) / 60000)
+          focusStart.current = 0
+        }
+      }
+    }
+  }, [running, mode])
 
   if (!isOpen) return null
 
